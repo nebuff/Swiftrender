@@ -1,0 +1,16 @@
+[package]
+name = "swiftrender"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "A small, std-only HTML/CSS rendering prototype (research artifact, not a browser)."
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]
+# Intentionally empty. Swiftrender is std-only by hard constraint; see SPEC.md §1.2.
+# No crate may be added without explicit human approval recorded in a commit message.
+
+[[bin]]
+name = "swiftrender"
+path = "src/main.rs"
