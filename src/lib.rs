@@ -13,10 +13,10 @@
 //!
 //! # Phase status
 //!
-//! * Phase 1 (this commit): [`html`] tokenizer and tree builder, plus a DOM dump for
-//!   `--emit tree`. No layout, no paint.
+//! * Phase 1: [`html`] tokenizer and tree builder.
 //! * Phase 2: [`css`] cascade and [`layout`] for the supported subset.
-//! * Phase 3: [`paint`] to PPM, PNG and SVG.
+//! * Phase 3: [`paint`] to PPM, PNG and SVG. The golden regression tests stay ignored until a
+//!   human approves the first render (`ROADMAP.md`, "Golden files: who signs them").
 //!
 //! Every module carries a `//!` header and every public item a doc comment, as required
 //! by `SPEC.md` §10.2.

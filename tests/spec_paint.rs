@@ -1,6 +1,6 @@
-//! `TESTS.md` group F — painting (T41–T47).
+//! `TESTS.md` group F — painting (T41–T47, plus T59's pixel half).
 //!
-//! Whole group waits for Phase 3. The assertions are deliberately about *pixels from the real
+//! All cases run from Phase 3. The assertions are deliberately about *pixels from the real
 //! artifact* (canvas, then PPM bytes in T46) rather than about an internal scene graph: paint
 //! is the layer where an in-process assertion can be true while the file on disk is wrong.
 
@@ -8,14 +8,16 @@ mod common;
 
 use common::*;
 
-/// T41 · background fill — In: `div{background:#123456;height:20px}` — Out: `(8,8)` is
+/// T41 · background fill — In: `div{background-color:#123456;height:20px}` — Out: `(8,8)` is
 /// `#123456`; `(791,599)` is still white.
 ///
 /// Why: §7.1/§7.3 the background covers the padding+border box and nothing else.
+///
+/// *Fixture corrected in Phase 3:* `SPEC.md` §3.6 supports `background-color`, not the
+/// `background` shorthand, so the original fixture was a declaration the cascade dropped.
 #[test]
-#[ignore = "phase 3: needs paint"]
 fn t41_background_fills_the_box() {
-    const FIXTURE: &str = "<style>div{background:#123456;height:20px}</style><div></div>";
+    const FIXTURE: &str = "<style>div{background-color:#123456;height:20px}</style><div></div>";
     let image = raster(FIXTURE);
     assert_eq!(image.rgb(8, 8), (0x12, 0x34, 0x56));
     assert_eq!(image.rgb(791, 599), (0xff, 0xff, 0xff));
@@ -26,7 +28,6 @@ fn t41_background_fills_the_box() {
 ///
 /// Why: §7.4 `border-color`'s initial value comes from the element's own colour.
 #[test]
-#[ignore = "phase 3: needs paint"]
 fn t42_border_color_defaults_to_current_color() {
     const FIXTURE: &str =
         "<style>div{color:#ff0000;border:1px solid;height:20px}</style><div></div>";
@@ -48,11 +49,16 @@ fn t42_border_color_defaults_to_current_color() {
 /// blue and `(8,38)` is red, i.e. the parent's paint is visible around the child.
 ///
 /// Why: §7.1 opaque colours composite in tree order.
+///
+/// *Fixture corrected in Phase 3:* both colours use the supported `background-color` longhand
+/// instead of the unsupported `background` shorthand, and the child is selected by class rather
+/// than by the unsupported `div div` descendant combinator. The class beats the tag selector on
+/// specificity, so it still exercises tree order rather than the cascade.
 #[test]
-#[ignore = "phase 3: needs paint"]
 fn t43_children_paint_over_their_parent() {
-    const FIXTURE: &str = "<style>div{background:#ff0000;height:40px} \
-                           div div{background:#0000ff;height:10px}</style><div><div></div></div>";
+    const FIXTURE: &str = "<style>div{background-color:#ff0000;height:40px} \
+                           .child{background-color:#0000ff;height:10px}</style>\
+                           <div><div class=\"child\"></div></div>";
     let image = raster(FIXTURE);
     assert_eq!(
         image.rgb(8, 8),
@@ -71,7 +77,6 @@ fn t43_children_paint_over_their_parent() {
 ///
 /// Why: §6.5 the cell is centred in the line box; §6.6 fixes its size at 8×16.
 #[test]
-#[ignore = "phase 3: needs paint"]
 fn t44_glyph_ink_stays_inside_the_cell() {
     let image = raster("<p>H</p>");
     assert!(image.has_ink(8, 26, 8, 16), "the glyph cell contains ink");
@@ -86,7 +91,6 @@ fn t44_glyph_ink_stays_inside_the_cell() {
 ///
 /// Why: §7.6 1-bit masks, so there must be no intermediate greys from anti-aliasing.
 #[test]
-#[ignore = "phase 3: needs paint"]
 fn t45_text_colour_paints_ink_without_anti_aliasing() {
     let image = raster("<style>p{color:#ff0000}</style><p>H</p>");
     for colour in image.colors() {
@@ -106,7 +110,6 @@ fn t45_text_colour_paints_ink_without_anti_aliasing() {
 ///
 /// Why: §7.2 the canvas starts opaque white, and the bytes on disk must match.
 #[test]
-#[ignore = "phase 3: needs paint"]
 fn t46_empty_document_is_a_white_canvas() {
     let ppm = ppm_bytes("<html></html>");
     let header = b"P6\n800 600\n255\n";
@@ -122,7 +125,6 @@ fn t46_empty_document_is_a_white_canvas() {
 ///
 /// Why: §6.8 the bullet is 8×16 and sits 16px left of the content box, not inside it.
 #[test]
-#[ignore = "phase 3: needs paint"]
 fn t47_list_marker_is_painted_outside_the_content_box() {
     let image = raster("<ul><li>a</li></ul>");
     assert!(
@@ -143,7 +145,6 @@ fn t47_list_marker_is_painted_outside_the_content_box() {
 /// the DOM layer (§2.3); the pixel assertion was originally deferred in a comment, which would
 /// have left the clause unreachable from the suite. Added at the Phase 1 gate.
 #[test]
-#[ignore = "phase 3: needs cascade (phase 2) and paint (phase 3)"]
 fn t59_class_selector_reaches_the_raster() {
     const FIXTURE: &str = "<style>.b{color:#00ff00}</style><div class=\"a b\">x</div>";
 

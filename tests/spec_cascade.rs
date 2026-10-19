@@ -1,7 +1,7 @@
 //! `TESTS.md` group B — the cascade (T9–T17).
 //!
-//! Every case here needs computed styles, so the whole group waits for Phase 2. The bodies
-//! are written out in full: un-ignoring them is the only change Phase 2 makes.
+//! Every case needs computed styles, which arrived in Phase 2. T9 and T16 also assert pixels,
+//! so they joined the running set with paint in Phase 3.
 
 mod common;
 
@@ -12,7 +12,6 @@ use common::*;
 ///
 /// Why: §3.3 specificity ordering.
 #[test]
-#[ignore = "phase 2: cascade not implemented"]
 fn t09_class_beats_tag() {
     const FIXTURE: &str = "<style>div{color:#ff0000} .k{color:#00ff00}</style><div class=k>x</div>";
     let lines = boxes(FIXTURE);
@@ -130,7 +129,6 @@ fn t15_important_is_parsed_and_ignored() {
 ///
 /// Why: §3.4a, the declared M1 deviation recorded in `QUESTIONS.md` Q1.
 #[test]
-#[ignore = "phase 2: cascade not implemented"]
 fn t16_style_attribute_is_ignored() {
     let lines = boxes("<p style=\"color:#ff0000\">x</p>");
     assert_eq!(

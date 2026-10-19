@@ -44,10 +44,14 @@ pub fn layout(node: &mut LayoutBox, cb_x: f64, cb_y: f64, cb_width: f64) -> f64 
     };
 
     // §6.4: an explicit height wins and the box is not shrunk by its content; children may
-    // overflow it, and §7.7 means nothing is clipped.
+    // overflow it, and §7.7 means nothing is clipped. For `auto`, the content height is only
+    // the distance between content edges, so padding and border must be added back to reach the
+    // border-box height the dump reports (SPEC.md §6.2a). Missing this makes a padded box's
+    // background too short and lets its text paint outside the box — visible in the first
+    // full-feature render even though the Phase 2 geometry tests did not catch it.
     let border_box_height = match style.height {
         Some(height) => height.max(0.0),
-        None => content_height,
+        None => content_height + padding.vertical() + border.vertical(),
     };
 
     node.rect = Rect {
@@ -141,5 +145,15 @@ mod tests {
         let div = find(&root, "div");
         assert_eq!((div.rect.y, div.rect.height), (8, 10));
         assert_eq!(find(&root, "p").rect.y, 24);
+    }
+
+    /// §6.4/§6.2a: an auto height is a *border-box* height, so padding and border are added to
+    /// the content height rather than eating into it.
+    #[test]
+    fn auto_height_includes_padding_and_border() {
+        let root = boxes("<style>div{padding:8px;border:1px solid}</style><div><p>x</p></div>");
+        let div = find(&root, "div");
+        // Content: p's 16px top margin + 20px line + 16px bottom margin = 52.
+        assert_eq!(div.rect.height, 52 + 16 + 2, "{root:#?}");
     }
 }

@@ -1,9 +1,8 @@
 //! `TESTS.md` group H — robustness (T55–T58, T60).
 //!
-//! T55–T57 are recovery clauses (§2.4, §2.6, §2.7) and are therefore verified at the DOM
-//! layer, which is the layer those clauses define; they run in Phase 1. T58 was split at the
-//! Phase 2 gate: the anti-quadratic property it guards is a *layout* property, so the tree half
-//! runs now and the pixel-determinism half waits for paint as T60.
+//! T55–T57 are recovery clauses (§2.4, §2.6, §2.7) and have run since Phase 1. T58 was split at
+//! the Phase 2 gate: its tree half runs from Phase 2, and its pixel-determinism half, T60, runs
+//! from Phase 3.
 
 mod common;
 
@@ -98,7 +97,6 @@ fn t58_bulk_input_stays_linear() {
 /// can be deterministic in layout and non-deterministic in paint (iteration order, uninitialised
 /// buffers), so the assertion has to be repeated at the paint layer rather than inherited.
 #[test]
-#[ignore = "phase 3: needs paint (split from T58 at the Phase 2 gate)"]
 fn t60_bulk_render_pixels_are_deterministic() {
     let fixture = "<div></div>".repeat(5_000);
     let started = std::time::Instant::now();

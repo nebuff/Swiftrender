@@ -1,8 +1,8 @@
 //! `TESTS.md` group A — tokenizer and tree construction (T1–T8).
 //!
 //! T5–T8 are `SPEC.md` §2 clauses and are therefore verified at the DOM layer, which is the
-//! layer §2 defines; they run in Phase 1. T1–T4 additionally assert geometry or computed
-//! display, so they wait for Phase 2.
+//! layer §2 defines; they have run since Phase 1. T1–T4 additionally assert geometry or pixel
+//! output, so they joined the running set with layout and paint (T3 in Phase 3).
 
 mod common;
 
@@ -46,7 +46,6 @@ fn t02_single_paragraph_geometry() {
 ///
 /// Why: §5.5 forced break without a closing tag.
 #[test]
-#[ignore = "phase 2: needs inline layout"]
 fn t03_void_br_starts_a_new_line() {
     let lines = boxes("<p>a<br>b</p>");
     let p = find(&lines, "p");

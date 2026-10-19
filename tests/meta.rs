@@ -25,7 +25,9 @@ const EXPECTED_SPEC_TESTS: usize = 63;
 ///   budget note below for why the number is 26 and not the 19 that was guessed at the gate.
 /// * Phase 2.75: **29** — 26 pixel-gated plus T61–T63, the golden regression tests, which are
 ///   ignored because no golden has been *approved* yet, not because paint is missing.
-/// * Phase 3: **0**.
+/// * Phase 3 stop point: **3** — all 26 pixel-gated tests are green and the ignored list is
+///   exactly T61–T63, waiting for the human to approve the first render (`ROADMAP.md`).
+/// * Phase 3 done: **0**, once those three goldens are signed and the `#[ignore]` attributes go.
 ///
 /// Bumping this constant is a deliberate, reviewable act: it can only go down as work lands, and
 /// it can only go up if a new test is added, never because a test started failing.
@@ -62,11 +64,15 @@ const EXPECTED_SPEC_TESTS: usize = 63;
 /// above — `passed == 34, ignored == 29, failed == 0` — and they are the only entries in the list
 /// that will be un-ignored by *approving an artifact* rather than by writing code.
 ///
+/// **Phase 3 stop point** is therefore `passed == 60, ignored == 3, failed == 0`. The 26
+/// pixel-gated tests leave the ignored set; the three goldens stay until the human looks at the
+/// PNG. The gate number is `60 / 3 / 0`, not `63 / 0 / 0`, until that signature exists.
+///
 /// Splitting a mixed test to move the number was considered and rejected: T6 was split because its
 /// clause §2.3 is fully satisfiable at the DOM layer, but for T3, T9, T32, T33 and friends the
 /// painted line *is* the clause ("a forced break paints two lines", "class beats tag"), and a
 /// half-test asserting only `p.height == 40` would assert less than the spec promises.
-const EXPECTED_IGNORED: usize = 29;
+const EXPECTED_IGNORED: usize = 3;
 
 /// One numbered test found in the `spec_*.rs` files.
 struct SpecTest {

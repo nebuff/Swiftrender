@@ -1,7 +1,8 @@
 //! `TESTS.md` group D — block layout (T25–T30).
 //!
-//! Whole group waits for Phase 2. These are the cases most likely to regress, because they
-//! pin the deliberate simplifications (no margin collapsing, no shrink-to-fit).
+//! All six run from Phase 3: the geometry halves were green in Phase 2 and T28's marker pixels
+//! arrived with paint. These are the cases most likely to regress, because they pin the
+//! deliberate simplifications (no margin collapsing, no shrink-to-fit).
 
 mod common;
 
@@ -57,7 +58,6 @@ fn t27_h1_uses_the_u32_metrics() {
 ///
 /// Why: §4 UA list padding plus §6.8 marker placement relative to the li content box.
 #[test]
-#[ignore = "phase 3: needs paint"]
 fn t28_list_indentation_and_markers() {
     let lines = boxes("<ul><li>a</li><li>b</li></ul>");
     let items = filter(&lines, "li");

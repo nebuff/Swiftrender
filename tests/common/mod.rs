@@ -25,6 +25,7 @@ use std::process::{Command, Output};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use swiftrender::html::{self, Child, Document, Node};
+use swiftrender::{css::Css, layout, paint};
 
 // ---------------------------------------------------------------------------
 // Parse tier
@@ -174,14 +175,38 @@ impl Raster {
 
 /// Paint `html` at the default canvas size.
 ///
-/// Panics until Phase 3 implements paint; every caller is `#[ignore]`d until then.
-pub fn raster(_html: &str) -> Raster {
-    unimplemented!("paint arrives in phase 3 (SPEC.md §7)")
+/// This runs the same library pipeline as the binary, in-process: the raster assertions are
+/// numerous and do not need a subprocess each. Artifact-contract tests (T46/T48/T49/T50/T51)
+/// deliberately still go through [`run_cli`], so a bug in CLI plumbing cannot hide behind this
+/// helper.
+pub fn raster(html: &str) -> Raster {
+    let document = html::parse(html);
+    let mut warnings = Vec::new();
+    let css = Css::from_document(&document, &mut warnings);
+    let tree = layout::layout_document(&document, &css, 800, 600, &mut warnings);
+    let canvas = paint::paint_tree(&tree);
+    Raster {
+        width: canvas.width,
+        height: canvas.height,
+        pixels: canvas.pixels,
+    }
 }
 
 /// Encode `html` as a PPM byte vector through the real binary.
+///
+/// The CLI defaults non-tree artifacts to a file beside the input (`SPEC.md` §9.1), so the
+/// helper names an explicit scratch path and reads it back rather than assuming stdout.
 pub fn ppm_bytes(html: &str) -> Vec<u8> {
-    run_cli(html, &["--emit", "ppm"]).stdout
+    let out = scratch_path("ppm");
+    let result = run_cli(html, &["--emit", "ppm", "--out", &out.to_string_lossy()]);
+    assert!(
+        result.status.success(),
+        "ppm run failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let bytes = std::fs::read(&out).expect("ppm written");
+    let _ = std::fs::remove_file(&out);
+    bytes
 }
 
 /// Encode `html` as PNG bytes through the real binary.
@@ -200,7 +225,16 @@ pub fn png_bytes(html: &str) -> Vec<u8> {
 
 /// Encode `html` as SVG text through the real binary.
 pub fn svg_text(html: &str) -> String {
-    String::from_utf8(run_cli(html, &["--emit", "svg"]).stdout).expect("svg is utf-8")
+    let out = scratch_path("svg");
+    let result = run_cli(html, &["--emit", "svg", "--out", &out.to_string_lossy()]);
+    assert!(
+        result.status.success(),
+        "svg run failed: {}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let text = std::fs::read_to_string(&out).expect("svg written");
+    let _ = std::fs::remove_file(&out);
+    text
 }
 
 // ---------------------------------------------------------------------------

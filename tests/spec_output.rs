@@ -1,7 +1,7 @@
 //! `TESTS.md` group G — output formats, CLI and the code-quality checks (T48–T54).
 //!
-//! T52–T54 are already meaningful in Phase 1 and run: they assert the process contract and the
-//! two `/src` rules. T48–T51 need an artifact to exist, so they wait for Phase 3.
+//! T52–T54 have run since Phase 1: they assert the process contract and the two `/src` rules.
+//! T48–T51 joined them when paint and the three encoders landed in Phase 3.
 
 mod common;
 
@@ -12,7 +12,6 @@ use common::*;
 ///
 /// Why: §8.2 fixes the byte layout, so a viewer can read it without guessing.
 #[test]
-#[ignore = "phase 3: needs paint"]
 fn t48_ppm_header_and_length_are_exact() {
     let ppm = ppm_bytes("<p>x</p>");
     let header = b"P6\n800 600\n255\n";
@@ -26,9 +25,8 @@ fn t48_ppm_header_and_length_are_exact() {
 ///
 /// Why: §8.3 — this is the test that proves the hand-rolled deflate/CRC/Adler code is correct.
 #[test]
-#[ignore = "phase 3: needs paint"]
 fn t49_png_is_well_formed_and_matches_ppm() {
-    const FIXTURE: &str = "<style>div{background:#123456;height:20px}</style><div></div>";
+    const FIXTURE: &str = "<style>div{background-color:#123456;height:20px}</style><div></div>";
     let png = png_bytes(FIXTURE);
     assert_eq!(&png[..8], &[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]);
 
@@ -52,14 +50,16 @@ fn t49_png_is_well_formed_and_matches_ppm() {
     assert_eq!(decode_png_rgb(&png), ppm[header.len()..].to_vec());
 }
 
-/// T50 · SVG structure and escaping — In: `div{background:#123456}` with `<p>a&amp;b</p>` —
-/// Out: an `<svg>` of the right size, a rect with the right fill, and escaped text.
+/// T50 · SVG structure and escaping — In: `div{background-color:#123456}` with `<p>a&amp;b</p>`
+/// — Out: an `<svg>` of the right size, a rect with the right fill, and escaped text.
 ///
 /// Why: §8.4 SVG is a structural dump, so the test asserts structure and escaping, not pixels.
+///
+/// *Fixture corrected in Phase 3:* the `background` shorthand is not a supported property
+/// (`SPEC.md` §3.6); the fixture now uses `background-color`.
 #[test]
-#[ignore = "phase 3: needs paint"]
 fn t50_svg_is_structural_and_escaped() {
-    const FIXTURE: &str = "<style>div{background:#123456;height:20px}</style>\
+    const FIXTURE: &str = "<style>div{background-color:#123456;height:20px}</style>\
                            <div></div><p>a&amp;b</p>";
     let svg = svg_text(FIXTURE);
     assert!(svg.contains("width=\"800\""), "{svg}");
@@ -74,7 +74,6 @@ fn t50_svg_is_structural_and_escaped() {
 ///
 /// Why: §8.5 a research artifact must be reproducible; no timestamps or paths may leak in.
 #[test]
-#[ignore = "phase 3: needs paint"]
 fn t51_output_is_byte_identical_across_runs() {
     const FIXTURE: &str = "<div>text<p>para</p>tail</div>";
     assert_eq!(

@@ -1,15 +1,17 @@
-//! `swiftrender` binary: read one HTML file, build the tree, and describe it (`SPEC.md` §9).
+//! `swiftrender` binary: read one HTML file, lay it out, and emit one artifact (`SPEC.md` §9).
 //!
-//! Phase 1 supports `--emit tree` only. `ppm`, `png` and `svg` parse correctly but exit `1`
-//! with an explicit message rather than pretending to render: honest failure is more useful
-//! than an empty file.
+//! `tree` goes to stdout by default; the three image/structural artifacts default to the input
+//! path with their own extension (`fixtures/hello.html` → `fixtures/hello.png`). `--out`
+//! overrides either rule, and a failed run never leaves a partial artifact behind.
 
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use swiftrender::cli::{self, CliError, Emit, Options};
 use swiftrender::css::{explain, parse::Selector, Css};
 use swiftrender::html;
 use swiftrender::layout;
+use swiftrender::paint;
 
 /// Exit code for a usage error (`SPEC.md` §9.2).
 const EXIT_USAGE: u8 = 2;
@@ -61,24 +63,36 @@ fn run(args: &[String]) -> ExitCode {
             Selector::parse(query).expect("the CLI rejects selectors outside the subset (§9.2)");
         let report = explain::explain(&document, &css, &selector);
         print_warnings(&options, &warnings);
-        return write_output(&options, report.as_bytes());
+        return write_output(options.out.as_deref(), report.as_bytes());
     }
 
     let tree = layout::layout_document(&document, &css, width, height, &mut warnings);
     print_warnings(&options, &warnings);
 
-    let text = match options.emit {
-        Emit::Tree => layout::dump_tree(&tree),
-        other => {
-            eprintln!(
-                "swiftrender: --emit {} is not implemented yet; run with --emit tree",
-                other.name()
-            );
-            return ExitCode::from(EXIT_FAILURE);
-        }
+    let bytes = match options.emit {
+        Emit::Tree => layout::dump_tree(&tree).into_bytes(),
+        Emit::Ppm => paint::ppm::encode(&paint::paint_tree(&tree)),
+        Emit::Png => paint::png::encode(&paint::paint_tree(&tree)),
+        Emit::Svg => paint::svg::encode(&tree).into_bytes(),
     };
 
-    write_output(&options, text.as_bytes())
+    write_output(default_output_path(&options).as_deref(), &bytes)
+}
+
+/// Where the artifact should go when `--out` is absent (`SPEC.md` §9.1).
+///
+/// `tree` and `--explain` are textual reports, so they stay on stdout; the three artifacts are
+/// written beside the input as `<stem>.<ext>`, which is what `swiftrender fixtures/hello.html
+/// --emit png` promises in `ROADMAP.md`.
+fn default_output_path(options: &Options) -> Option<String> {
+    if options.explain.is_some() || options.emit == Emit::Tree {
+        return options.out.clone();
+    }
+    options.out.clone().or_else(|| {
+        let mut path = PathBuf::from(&options.input);
+        path.set_extension(options.emit.extension());
+        Some(path.to_string_lossy().into_owned())
+    })
 }
 
 /// Print collected warnings to stderr when `--verbose` is set (§9.3).
@@ -90,9 +104,9 @@ fn print_warnings(options: &Options, warnings: &[String]) {
     }
 }
 
-/// Write `bytes` to `--out`, or to stdout when no path was given.
-fn write_output(options: &Options, bytes: &[u8]) -> ExitCode {
-    match &options.out {
+/// Write `bytes` to `path`, or to stdout when no path was given.
+fn write_output(path: Option<&str>, bytes: &[u8]) -> ExitCode {
+    match path {
         Some(path) => match std::fs::write(path, bytes) {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {

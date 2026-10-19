@@ -1,7 +1,8 @@
 //! `TESTS.md` group C — box model (T18–T24).
 //!
-//! Whole group waits for Phase 2: every case is a geometry or paint assertion about the
-//! content/border/margin boxes of the supported properties.
+//! Every case is a geometry or paint assertion about the content/border/margin boxes of the
+//! supported properties. The geometry cases ran from Phase 2; T21 and T23 joined them when
+//! paint landed in Phase 3.
 
 mod common;
 
@@ -45,7 +46,6 @@ fn t20_padding_narrows_the_content_box() {
 ///
 /// Why: §7.4 the border occupies the band between the padding box and the border box.
 #[test]
-#[ignore = "phase 3: needs paint"]
 fn t21_border_occupies_the_border_band() {
     const FIXTURE: &str = "<style>div{border:2px solid #ff0000;height:20px}</style><div></div>";
     let lines = boxes(FIXTURE);
@@ -78,7 +78,6 @@ fn t22_asymmetric_margins_offset_both_axes() {
 ///
 /// Why: §5.1 no box, no text, no paint.
 #[test]
-#[ignore = "phase 2: needs box generation"]
 fn t23_display_none_removes_the_subtree() {
     const FIXTURE: &str = "<style>.g{display:none}</style><div class=g>gone</div><p>z</p>";
     let lines = boxes(FIXTURE);

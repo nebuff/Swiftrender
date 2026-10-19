@@ -1,8 +1,8 @@
 //! `TESTS.md` group E — inline formatting (T31–T40).
 //!
-//! Whole group waits for Phase 2 (or Phase 3 where paint is asserted). These cases pin the
-//! line-breaking and whitespace rules of `SPEC.md` §6.5, which are the ones a reader is most
-//! likely to disagree with — which is exactly why they are numbered.
+//! The line-breaking and whitespace cases ran from Phase 2; the pixel halves (T32–T38) joined
+//! them when paint landed in Phase 3. These cases pin the rules of `SPEC.md` §6.5 that a reader
+//! is most likely to disagree with — which is exactly why they are numbered.
 
 mod common;
 
@@ -35,7 +35,6 @@ fn t31_lines_break_greedily() {
 ///
 /// Why: §6.5 words are never split, and overflowing is not an error.
 #[test]
-#[ignore = "phase 2: needs inline layout"]
 fn t32_unbreakable_words_overflow() {
     let fixture = format!("<p>{}</p>", "a".repeat(200));
     let lines = boxes(&fixture);
@@ -51,7 +50,6 @@ fn t32_unbreakable_words_overflow() {
 ///
 /// Why: §6.5 the offset rounds once: `8 + round((784-24)/2)`.
 #[test]
-#[ignore = "phase 2: needs inline layout"]
 fn t33_center_alignment_rounds_once() {
     const FIXTURE: &str = "<style>p{text-align:center}</style><p>abc</p>";
     assert_eq!(find(&boxes(FIXTURE), "#text").x, 388);
@@ -66,7 +64,6 @@ fn t33_center_alignment_rounds_once() {
 ///
 /// Why: §6.5 the right offset is `W - used`.
 #[test]
-#[ignore = "phase 2: needs inline layout"]
 fn t34_right_alignment_flushes_to_the_edge() {
     const FIXTURE: &str = "<style>p{text-align:right}</style><p>abc</p>";
     let lines = boxes(FIXTURE);
@@ -77,15 +74,19 @@ fn t34_right_alignment_flushes_to_the_edge() {
     );
 }
 
-/// T35 · inline fragment background — In: `.s{background:#00ff00}` on
+/// T35 · inline fragment background — In: `.s{background-color:#00ff00}` on
 /// `<p><span class=s>ab</span></p>` — Out: a green rect exactly `(8,24,16,20)`, white at
 /// `(24,24)`.
 ///
 /// Why: §7.1 an inline box paints the whole line box height, not just the glyph cell.
+///
+/// *Fixture corrected in Phase 3:* the original used the `background` shorthand, which
+/// `SPEC.md` §3.6 does not support. The test is about paint order, not the shorthand, so it now
+/// uses the supported `background-color` longhand.
 #[test]
-#[ignore = "phase 3: needs paint"]
 fn t35_inline_fragments_paint_the_line_box() {
-    const FIXTURE: &str = "<style>.s{background:#00ff00}</style><p><span class=s>ab</span></p>";
+    const FIXTURE: &str =
+        "<style>.s{background-color:#00ff00}</style><p><span class=s>ab</span></p>";
     let image = raster(FIXTURE);
     assert_eq!(image.rgb(8, 24), (0x00, 0xff, 0x00));
     assert_eq!(
@@ -105,7 +106,6 @@ fn t35_inline_fragments_paint_the_line_box() {
 ///
 /// Why: §5.5 an empty line box still occupies its height.
 #[test]
-#[ignore = "phase 2: needs inline layout"]
 fn t36_consecutive_breaks_make_empty_lines() {
     let lines = boxes("<p>a<br><br>b</p>");
     assert_eq!(find(&lines, "p").height, 60, "{lines:#?}");
@@ -115,37 +115,47 @@ fn t36_consecutive_breaks_make_empty_lines() {
     assert!(image.has_ink(8, 66, 8, 8), "line 3 has ink");
 }
 
-/// T37 · image placeholder default — In: `<p>x<img></p>` — Out: an img box `150×50`, `p h=50`,
-/// img at `x=16`.
+/// T37 · image placeholder default — In: `<p>x<img></p>` — Out: an img box `150×50` at
+/// `(16,24)`, `p h=50`.
 ///
 /// Why: §5.6 intrinsic size and §6.5 the atomic inline drives the line height.
+///
+/// *Pixel expectation corrected in Phase 3:* the original sampled `(16,8)`, which is above the
+/// paragraph's border box. The paragraph starts at `y=24` after the UA 16px margin, so the
+/// placeholder begins at `(16,24)`.
 #[test]
-#[ignore = "phase 3: needs paint"]
 fn t37_image_uses_its_intrinsic_size() {
     let lines = boxes("<p>x<img></p>");
     let image_box = find(&lines, "img");
     assert_eq!(
-        (image_box.x, image_box.width, image_box.height),
-        (16, 150, 50),
+        (image_box.x, image_box.y, image_box.width, image_box.height),
+        (16, 24, 150, 50),
         "{lines:#?}"
     );
     assert_eq!(find(&lines, "p").height, 50);
-    assert_eq!(raster("<p>x<img></p>").rgb(16, 8), (0xc0, 0xc0, 0xc0));
+    assert_eq!(raster("<p>x<img></p>").rgb(16, 24), (0xc0, 0xc0, 0xc0));
 }
 
 /// T38 · image explicit size — In: `img{width:20px;height:10px}` with `<p><img></p>` — Out:
-/// img `20×10`, `p h=20`, placeholder at `(8,8)`.
+/// img `20×10` at `(8,29)`, `p h=20`.
 ///
 /// Why: §5.6 CSS size overrides the intrinsic size; §6.5 `line-height` still wins the line box.
+///
+/// *Pixel expectation corrected in Phase 3:* the paragraph starts at `y=24`, and a 10px item is
+/// centred in the 20px line box, so the placeholder starts at `24 + round((20−10)/2) = 29`, not
+/// at the paragraph's top edge.
 #[test]
-#[ignore = "phase 3: needs paint"]
 fn t38_image_css_size_overrides_intrinsic() {
     const FIXTURE: &str = "<style>img{width:20px;height:10px}</style><p><img></p>";
     let lines = boxes(FIXTURE);
     let image_box = find(&lines, "img");
-    assert_eq!((image_box.width, image_box.height), (20, 10), "{lines:#?}");
+    assert_eq!(
+        (image_box.x, image_box.y, image_box.width, image_box.height),
+        (8, 29, 20, 10),
+        "{lines:#?}"
+    );
     assert_eq!(find(&lines, "p").height, 20);
-    assert_eq!(raster(FIXTURE).rgb(8, 8), (0xc0, 0xc0, 0xc0));
+    assert_eq!(raster(FIXTURE).rgb(8, 29), (0xc0, 0xc0, 0xc0));
 }
 
 /// T39 · anonymous block boxes — In: `<div>text<p>para</p>tail</div>` — Out: three children

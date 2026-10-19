@@ -36,13 +36,26 @@ fn render(name: &str) -> Vec<u8> {
     let fixture = manifest_dir().join("fixtures").join(format!("{name}.html"));
     let html = std::fs::read_to_string(&fixture)
         .unwrap_or_else(|error| panic!("fixture {} is unreadable: {error}", fixture.display()));
-    let output = run_cli(&html, &["--emit", "ppm", "--size", CANVAS]);
+    let out = scratch_path("ppm");
+    let output = run_cli(
+        &html,
+        &[
+            "--emit",
+            "ppm",
+            "--size",
+            CANVAS,
+            "--out",
+            &out.to_string_lossy(),
+        ],
+    );
     assert!(
         output.status.success(),
         "rendering {name} failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    output.stdout
+    let bytes = std::fs::read(&out).expect("golden render written");
+    let _ = std::fs::remove_file(&out);
+    bytes
 }
 
 /// Compare `name`'s render against its approved golden, or fail with the first differing pixels.

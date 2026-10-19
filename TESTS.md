@@ -174,19 +174,26 @@ extends past x=792, no error. Why: §6.5 no mid-word breaks, no crash.
 **T34 · right alignment** — In: `p{text-align:right}` with `<p>abc</p>` — Out: first ink x =
 768, last ink ends at 791. Why: §6.5 right offset is `W − used`.
 
-**T35 · inline fragment background** — In: `.s{background:#00ff00}` on
+**T35 · inline fragment background** — In: `.s{background-color:#00ff00}` on
 `<p><span class=s>ab</span></p>` — Out: green rect exactly `(8,24,16,20)`; white at `(24,24)`.
 Why: §7.1 inline boxes paint the full line box height, not just the glyph cell.
+
+*Fixture corrected in Phase 3:* the original used the `background` shorthand, which `SPEC.md`
+§3.6 does not support; the test is about paint order, so it now spells the supported longhand.
 
 **T36 · consecutive breaks** — In: `<p>a<br><br>b</p>` — Out: `p h=60`, ink in lines 1 and 3,
 line 2 blank. Why: §5.5 empty line boxes still occupy height.
 
-**T37 · image placeholder default** — In: `<p>x<img></p>` — Out: img box `150×50`, `p h=50`,
-img x = `8+8=16`. Why: §5.6 intrinsic size and §6.5 line height driven by an atomic inline.
+**T37 · image placeholder default** — In: `<p>x<img></p>` — Out: img box `150×50` at
+`(16,24)`, `p h=50`. Why: §5.6 intrinsic size and §6.5 line height driven by an atomic inline.
+
+*Pixel expectation corrected in Phase 3:* the original sampled `(16,8)`, above the paragraph's
+border box. The UA `p` margin puts the paragraph at `y=24`, so the placeholder starts there.
 
 **T38 · image explicit size** — In: `img{width:20px;height:10px}` with `<p><img></p>` — Out:
-img `20×10`, `p h=20` (line-height dominates), placeholder `#c0c0c0` at `(8,8)`. Why: §5.6
-override plus §6.5 max-of-items rule.
+img `20×10` at `(8,29)`, `p h=20` (line-height dominates), placeholder `#c0c0c0` at `(8,29)`.
+Why: §5.6 override plus §6.5 max-of-items rule. *Corrected in Phase 3:* a 10px item is centred
+in the 20px line box, so `y = 24 + round((20−10)/2) = 29`, not the paragraph's top edge.
 
 **T39 · anonymous block boxes** — In: `<div>text<p>para</p>tail</div>` — Out: `div` has
 exactly 3 children: `#anon(h=20)`, `p(h=20, margins 16)`, `#anon(h=20)`; `div h=92`; order
@@ -197,18 +204,21 @@ first ink at x=8. Why: §6.5 leading/trailing spaces must not shift alignment.
 
 ### F. Painting (T41–T47)
 
-**T41 · background fill** — In: `div{background:#123456}` — Out: pixel
+**T41 · background fill** — In: `div{background-color:#123456}` — Out: pixel
 `(8,8) = (0x12,0x34,0x56)`; pixel `(791,599)` still white. Why: §7.1/§7.3 background covers
-content+padding+border only.
+content+padding+border only. *Fixture corrected in Phase 3:* `SPEC.md` §3.6 supports
+`background-color`, not the `background` shorthand.
 
 **T42 · border defaults to currentColor** — In: `div{color:#ff0000;border:1px solid}` — Out:
 border pixels red, text absent. Why: §7.4 `border-color` initial value.
 
-**T43 · child paints over parent** — In: `div{background:#ff0000;height:40px}` with nested
-`div div{background:#0000ff;height:10px}` — Out: `(8,8)` blue, `(8,38)` red. Why: §7.1
-tree-order compositing with opaque colours. (Fixture corrected in Phase 1: the original
-fixture omitted the parent's height, and under §6.4 the parent's auto height would have been
-exactly the child's 10px, leaving no parent paint to observe at y=38.)
+**T43 · child paints over parent** — In: `div{background-color:#ff0000;height:40px}` around
+`<div class="child">` with `.child{background-color:#0000ff;height:10px}` — Out: `(8,8)` blue,
+`(8,38)` red. Why: §7.1 tree-order compositing with opaque colours. (Fixture corrected in
+Phase 1: the original omitted the parent's height, and under §6.4 the parent's auto height
+would have been exactly the child's 10px, leaving no parent paint to observe at y=38. In Phase
+3 both backgrounds moved to `background-color` and the child moved from the unsupported
+`div div` descendant selector to a class.)
 
 **T44 · glyph ink is inside the cell** — In: `<p>H</p>` — Out: ≥1 black pixel in `(8,26,8,16)`,
 all pixels at y=25 white. Why: §6.5 centred cell and §6.6 cell extent.
@@ -239,10 +249,11 @@ paint (Phase 3).
 chunk CRC-32 recomputed by the test matches; after stripping filter bytes, raster equals the
 PPM payload byte-for-byte. Why: §8.3 proves our hand-rolled zlib/CRC/Adler is right.
 
-**T50 · SVG structure and escaping** — In: `div{background:#123456}` with `<p>a&amp;b</p>` —
-Out: `<svg … width="800" height="600"`, one `<rect … fill="#123456"/>`,
-`<text …>a&amp;amp;b</text>` escaped correctly, well-formed XML. Why: §8.4 structural
-contract.
+**T50 · SVG structure and escaping** — In: `div{background-color:#123456}` with `<p>a&amp;b</p>`
+— Out: `<svg … width="800" height="600"`, one `<rect … fill="#123456"/>`,
+`<text …>a&amp;b</text>` escaped correctly, well-formed XML. Why: §8.4 structural
+contract. *Corrected in Phase 3:* the fixture uses the supported `background-color`, and the
+SVG text is escaped exactly once (`a&b` → `a&amp;b`).
 
 **T51 · determinism** — In: run the T39 fixture twice, same args — Out: outputs byte-identical,
 no timestamps/paths inside. Why: §8.5 reproducible artifacts for a research repo.
