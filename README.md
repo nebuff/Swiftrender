@@ -26,7 +26,7 @@ research output.
 - Cascades tag and class selectors (see `SPEC.md` §3)
 - Block and inline layout, no floats/flex/grid (see `SPEC.md` §6)
 - Paints to PPM, PNG (hand-rolled stored-deflate), or SVG (§8)
-- 59 numbered tests, each citing its SPEC clause (`TESTS.md`)
+- 63 numbered tests, each citing its SPEC clause (`TESTS.md`)
 
 ## What it explicitly does not do
 

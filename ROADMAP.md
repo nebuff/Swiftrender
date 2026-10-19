@@ -11,8 +11,33 @@ previous count.
 | 2 | cascade, block/inline layout, `--emit tree` | complete (`33b9c16`) |
 | 2.5 | `--explain` cascade introspection | complete (`79a6b82`) |
 | 2.75 | golden-harness infrastructure, no goldens | complete — see below |
-| 3 | paint: PPM, PNG, SVG | **next** |
-| 4 | notes and reflection | not started |
+| 3 | paint: PPM, PNG, SVG | paint complete (`b0a3c26`); human eyeball passed; T61–T63 await goldens |
+| 3.5 | shared paint visitor; behavior-neutral | scheduled after Phase 3 close |
+| 4 | notes and reflection | `NOTES.md` started during Phase 3 |
+
+### Phase 3 gate log
+
+- **2026-10-18 — `b0a3c26`.** Paint landed: PPM, PNG and SVG from one tree-order pass, the
+  hand-drawn 8×16 font, six Phase 0 fixtures corrected (not weakened), and the auto-height bug
+  fixed in `src/layout/block.rs`.
+- **Numbered tests:** 60 passed / 3 ignored / 0 failed. All 26 pixel-gated tests are green.
+  T61–T63 remain ignored and no `.expected.ppm` exists.
+- **Human eyeball:** passed on the 800×600 `hello.png` render — borders render, the auto-height
+  fix is visibly validated, and list markers, link colour and the image placeholder are correct.
+- **Provenance check:** the original `background:` and `div div` fixture lines were added in
+  `de211f0` (the first commit that persisted `TESTS.md`) and stayed unchanged through `6a03732`.
+  The Phase 3 commit is the only one that changes them, so they were **wrong as approved**, not
+  altered to match the engine. The corrections stand.
+- **Still open for Phase 3 close:** the three approved goldens and `63/0/0`. `NOTES.md` is started;
+  an external `pngcheck` run remains a note rather than a blocker (only `file` and an independent
+  Pillow decode were available here).
+
+## Phase 3.5 — shared paint visitor (scheduled)
+
+Raster and SVG currently walk the box tree separately. Extract one visitor so both consume the same
+§7.1 ordering, with no behavior change. This is deliberately **after** the goldens are signed: the
+renderer is frozen while the human approves the images, then refactored with those goldens as the
+regression check. Gate after the refactor: `63 passed / 0 ignored / 0 failed`.
 
 ## Permanent refusals
 

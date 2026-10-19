@@ -375,3 +375,72 @@ same function the golden tests call, and compares it with the same `compare_imag
 test asserts that a missing file returns an error naming the path. Without those, a path bug in the
 harness would surface during Phase 3 as "paint is broken", and the first hour of the phase would be
 spent debugging the wrong layer.
+
+## 13. Phase 3 — paint, and the first eyeball
+
+**Human:** greenlit Phase 3 with a hard stop. Implement paint until the 26 pixel-gated tests pass;
+do not generate `.expected.ppm` files; do not un-ignore T61–T63; when the 26 are green, stop and
+hand over the command for `/tmp/hello.ppm`. The same instruction asked for the font's glyph count,
+native size, source and file to be documented before the font landed, and listed the likely
+failure modes: raster arithmetic, paint order, `currentColor`, transparent backgrounds, glyph
+centering, the `li` marker offset, and PNG framing.
+
+**Effect:** paint landed in `b0a3c26` as one tree-order pass over the finished box tree. The
+numbered suite is **60 passed / 3 ignored / 0 failed**; the 26 pixel-gated tests are green;
+T61–T63 remain ignored and no golden exists. `cargo fmt --check` and
+`cargo clippy --all-targets -- -D warnings` both exit 0, and no `src/` file exceeds 400 lines.
+
+**The font.** 95 printable ASCII glyphs, native 8×16, hand-drawn for this project on a 5×7 grid
+and expanded by nearest-neighbour column repetition and row doubling with a one-pixel top and
+bottom pad. It is not a VGA ROM copy. The table and its provenance are in `src/paint/font.rs`.
+
+**Six fixtures were corrected, not weakened.** T35, T41, T43, T49 and T50 used the `background`
+shorthand, which `SPEC.md` §3.6 does not support; they now use `background-color`. T43 also used
+the unsupported `div div` descendant selector; the child is now `.child`, which keeps the
+child-over-parent assertion and moves the specificity test into the cascade. T37 and T38 sampled
+pixels at `y=8`, above the paragraph's border box; they now sample the actual placeholders at
+`(16,24)` and `(8,29)`. T50's `TESTS.md` note had double-escaped `a&amp;amp;b`; the contract is
+one escape, `a&b` → `a&amp;b`.
+
+**Provenance verified after review.** The original `background:` and `div div` fixture lines were
+introduced in `de211f0`, the first commit that persisted `TESTS.md`, and survived unchanged through
+`6a03732`. The Phase 3 commit is the only one that changes them. The fixtures were therefore wrong
+*as approved*, not edited later to match the engine; the corrections stand.
+
+**The first render found a Phase 2 bug.** A block's auto border-box height was set to its content
+height, so padding and border ate into the box instead of adding to it. The geometry tests did not
+notice — the `.note` panel in `hello.html` was 20px tall instead of 38px and its text overflowed —
+but the first PNG made it visible. `src/layout/block.rs` now adds padding and border back for
+`auto`, with a unit test.
+
+**Human eyeball:** passed on the 800×600 `hello.png` render — borders render, the auto-height fix
+is visibly validated, and list markers, link colour and the image placeholder are correct.
+
+**The commit message, recorded rather than rewritten.** `b0a3c26` reached `origin/main` with the
+placeholder subject "Final test of stage 2". The intended message was:
+
+```text
+Phase 3: paint the box tree to PPM, PNG and SVG
+
+The 8x16 font is 95 printable ASCII glyphs hand-drawn on a 5x7 grid
+and expanded nearest-neighbour in-tree; it is not copied from a VGA ROM.
+
+26 pixel-gated tests are green; the human eyeball check on hello.png
+passed — borders render, the auto-height fix is visibly validated, list
+markers, link color, and image placeholder are all correct.
+
+Six test fixtures were corrected, not weakened: the unsupported
+`background` shorthand became `background-color`, T43's `div div` became
+`.child`, and T37/T38 now sample the image placeholders at their real
+coordinates.
+
+The auto-height bug in block.rs is fixed: a border-box auto height now
+adds padding and border back to the content height.
+
+T61-T63 remain ignored pending approved goldens.
+```
+
+Rewriting a published commit would require a force-push, so the message is recorded here and the
+history is left intact. The remaining Phase 3 close items are the three approved goldens
+(`63/0/0`), `NOTES.md`, and an external `pngcheck` run; only `file` and an independent Pillow
+decode were available in this environment.
