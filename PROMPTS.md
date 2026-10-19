@@ -271,3 +271,39 @@ review note. The reflog additionally shows a reset followed by a re-commit (`4da
 tree) after the gate commit was made, so the branch has already been rewritten once locally; adding
 another rewrite would make the log harder to trust, not easier. The mapping in §6 stands as the
 record: `33b9c16` contains Phase 2.
+
+## 10. Phase 2.75 — splits and the golden harness
+
+Three commits, in the order the gate asked for: the definition of done, the file splits, then the
+harness.
+
+**The definition of done moved into the repo** (`ROADMAP.md`). A gate that exists only in a review
+message is not a gate, and Phase 3's had already survived one round trip as prose. Items 3 and 4 —
+a human opens the image, and an external decoder parses it — are the two no test can replace: T49
+validates PNG bytes with the *in-tree* decoder, which shares the writer's assumptions and so cannot
+catch a bug the two have in common.
+
+**Both flagged files were split before paint, not during it.** `tree.rs` (391) became `dom.rs`
+(the node model every later layer reads, 150) and `tree.rs` (construction, 253); `parse.rs` (372)
+became `rule.rs` (selector and rule types plus the single definition of cascade order, 148) and
+`parse.rs` (the scanner, 238). The longest source file is now 360. Two details worth keeping:
+
+* The split was done by **parsed item boundaries with an assertion that each marker appears exactly
+  once** — the Phase 2 lesson about a split that cut at the wrong `grep` hit, applied *before*
+  repeating it rather than after.
+* `parse.rs` re-exports the moved types (`pub use super::rule::{…}`) so `css::parse::Selector`
+  keeps naming the same type. A split that forces every call site to change is a rename wearing a
+  split's clothes; this one changes no public path.
+
+**The golden harness is staged, not blessed.** `tests/spec_golden.rs` compares a render against
+`fixtures/<name>.expected.ppm` at 200×150, and **no golden exists**. The comparison reads the file
+at runtime rather than through `include_bytes!` — a compile-time include would make this commit
+uncompilable, since the files cannot exist before a human approves a render. The three tests are
+`#[ignore]`d with the missing file named in the reason, so un-ignoring one early fails with the
+policy, not a bare file-not-found. Goldens are PPM because byte comparison needs no decoder, which
+keeps the zero-dependency premise intact.
+
+**Arithmetic, again.** The gate wrote Phase 3's exit as `60/0/0`. Adding T61–T63 makes it `63/0/0`;
+`ignored` is now 29 = the 26 pixel-gated tests + 3 goldens, so Phase 2.75 sits at `34/29/0`. That is
+the fifth count in this project derived from prose and the fifth that needed the scan to correct it,
+which is exactly why §8 exists and why `ROADMAP.md` states the number with its composition.
