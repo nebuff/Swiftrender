@@ -155,11 +155,15 @@ Each was corrected in the test *and* in `TESTS.md`, with the reason recorded inl
 * **T12** expected the paragraph's margin to be zero, contradicting the UA sheet's `p { margin: 16px
   0 }`. "Not inherited" means it keeps its own margin, not that it has none.
 
-**One deviation had to be written into the spec.** T20 and T21, as approved in Phase 0, contradict
-each other under CSS's default content-box sizing: T21 wants `height: 20px` plus a 2px border to
-produce a 20px-tall box, while T20 wants `width: auto` plus padding to keep the border box at 784px.
-M1 therefore uses **border-box** sizing for explicit `width`/`height`, recorded as `SPEC.md` §6.2a.
-The dump's `w`/`h` are border-box dimensions, which is what every geometry test already assumed.
+**One deviation had to be written into the spec.** M1 uses **border-box** sizing for explicit
+`width`/`height`, recorded as `SPEC.md` §6.2a; the dump's `w`/`h` are border-box dimensions, which
+is what every geometry test already assumed. The *reason* was first stated wrongly here and
+corrected at review: T20 on its own is model-independent (`width: auto` gives a 784px border box
+either way), so naming T20 as half of a contradiction was inaccurate. The real pressure is T21 read
+through a single dump with T20 — under content-box, `height: 20px` + 2px borders is 24px tall and
+T21's `h == 20` fails; report content-box dims instead and T20's `x == 8` fails. No single
+reporting convention satisfies both, so border-box is forced *given the tests as approved*.
+Border-box is also independently the nicer model — but that is a preference, not the justification.
 
 **A tool caught what the agent's memory did not.** After the first full run, the agent reported
 "only three failing tests"; that was an artifact of `cargo` stopping at the first failing test
@@ -175,3 +179,38 @@ as instructed at the Phase 1 gate — and the first split attempt itself was wro
 that appeared earlier in the file than the agent assumed, so the "split" moved half of the module
 into the wrong file. The fix was to reconstruct from the preserved parts and split by *parsed item
 boundaries* rather than by line numbers remembered from an earlier `grep`.
+
+## 6. Phase 2 review — the gate, resolved
+
+**Check 1 — §6.2a (border-box).** The review could not derive the contradiction from T20/T21 as
+written, and it was right not to: the note blamed T20, which is model-independent. The arithmetic
+that does hold was added to `SPEC.md` §6.2a and to the paragraph above: content-box + a border-box
+dump fails T21, content-box + a content-box dump fails T20, therefore border-box. "Forced" stands;
+the *derivation* was wrong and is now shown rather than asserted. The review's alternative framing
+— "proactively specified" — was declined for that reason, but its observation that border-box is
+a sensible M1 default is recorded, because a future phase might wonder why we deviated at all.
+
+**Check 2 — the four corrections.** Both files carry all four: `TESTS.md` (T31 fixture note, T4/T11/
+T12 reason lines) and the test bodies in `spec_parse.rs`, `spec_cascade.rs`, `spec_inline.rs`. Four
+hunks, as required. What the check could not see, because the tree was already clean by then: the
+Phase 2 work was committed by the repository owner as `33b9c16` **with the message "Phase 1"**. The
+code is fine; the audit trail is not. Rewriting a commit the owner made is not the agent's call, so
+the mapping is recorded here instead: **`33b9c16` contains Phase 2**, and `de211f0`/`cf73f20` are
+the Phase 1 artifacts. The commit message written at the gate (`Phase 2: cascade, block/inline
+layout…`) describes the same contents and can be used for an amend if the owner wants one.
+
+**Check 3 — T58 split.** Taken. T58 now asserts the layout property it exists to protect — 5,000
+divs in a tree dump under 2 s (measured 0.21 s debug / 0.02 s release), byte-identical twice, and
+**all 5,000 boxes present** — and T60 keeps the PNG determinism for Phase 3. The box count was added
+because a quadratic layout may drop boxes silently rather than run slow, and unlike timing it does
+not depend on machine load.
+
+The review predicted this gate would become `34 / 25 / 0`. It becomes **`34 / 26 / 0`**: splitting a
+test re-partitions the list instead of shrinking it, so T58 leaves the ignored set and T60 joins it,
+and the numbered list grows to 60. That is the third arithmetic correction in two gates (`40 / 19`,
+then `24` vs `26`, now `25` vs `26`), all with the same root cause — reasoning about counts from
+memory instead of from the artifacts. `tests/meta.rs` still derives its budget from a scan.
+
+**Scheduled for Phase 2.5:** `--explain <selector>`, a cascade debugging aid showing matched rules
+in specificity order with dropped declarations and why. Scoped by the review to one meta-test only;
+it is a debugging tool, not part of the artifact's contract.

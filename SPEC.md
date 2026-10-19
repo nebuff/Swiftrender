@@ -123,11 +123,17 @@ a      { color: #0000ee }
   `Npx` → `N`; `auto` margins → `0` (no centering).
 - **§6.2a** *(added at the Phase 2 gate)* An explicit `width`/`height` is a **border-box**
   dimension, not a content-box one: padding and border eat into it rather than growing the box.
-  This deviates from CSS's default `content-box`, and it is forced by the numbered tests as
-  approved — T21 expects `border: 2px solid` plus `height: 20px` to produce a 20px-tall box,
-  while T20 expects `padding: 10px` with `width: auto` to keep the border box at 784px and narrow
-  only the content box. Under content-box semantics those two expectations contradict each other.
-  The deviation is visible in the dump, where `w`/`h` are always border-box dimensions.
+  The dump's `w`/`h` (§8.1) are always border-box dimensions.
+  *Why this is forced and not merely chosen* — the first draft of this note named the wrong test,
+  and review caught it: T20 on its own is model-independent, since `width: auto` yields a 784px
+  border box under either model. The pressure comes from T21 read against T20 through a single
+  dump: under content-box, `height: 20px` plus 2px borders makes a 24px-tall element and T21's
+  `h == 20` fails. Switching the dump to *content-box* dimensions rescues T21 but breaks T20,
+  whose `padding: 10px` would then report `x = 18`, `w = 764` instead of the asserted `x = 8`,
+  `w = 784`. No single reporting convention satisfies both tests under content-box sizing, so
+  border-box is the minimum change that does. It is also independently the better M1 choice —
+  it is what most authors mean — but that is a preference, not the justification; the deviation
+  is confined to explicit `width`/`height`, and `auto` behaves exactly as §6.2 says.
 - **§6.3** Block position: content top = parent content top + accumulated flow offset +
   `margin-top`. **Vertical margins MUST NOT collapse.** Horizontal offset = parent content
   left + `margin-left` + `border-left` + `padding-left`.

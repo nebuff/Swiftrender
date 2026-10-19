@@ -10,8 +10,9 @@
 
 use std::path::{Path, PathBuf};
 
-/// Number of numbered tests defined by `TESTS.md` (T59 was added at the Phase 1 gate).
-const EXPECTED_SPEC_TESTS: usize = 59;
+/// Number of numbered tests defined by `TESTS.md` (T59 was added at the Phase 1 gate, T60 at the
+/// Phase 2 gate when T58 was split).
+const EXPECTED_SPEC_TESTS: usize = 60;
 
 /// How many numbered tests are `#[ignore]`d at this phase.
 ///
@@ -31,7 +32,7 @@ const EXPECTED_SPEC_TESTS: usize = 59;
 /// ```text
 /// T3  T9  T16 T21 T23 T28 T32 T33 T34 T35 T36 T37 T38 T59     (layout+paint cases)
 /// T41 T42 T43 T44 T45 T46 T47                                 (paint-only)
-/// T48 T49 T50 T51 T58                                         (artifact and perf cases)
+/// T48 T49 T50 T51 T60                                         (artifact and perf cases)
 /// ```
 ///
 /// That leaves **23** tests that Phase 2 can flip: T1, T2, T4, T10–T15, T17–T20, T22, T24–T27,
@@ -39,6 +40,14 @@ const EXPECTED_SPEC_TESTS: usize = 59;
 /// the `40 / 19` assumed when the gate was set. The count is derived by scanning the test bodies
 /// for pixel helpers (`raster`, `has_ink`, `ppm_bytes`, `png_bytes`, `svg_text`), so it can be
 /// re-derived at any time instead of remembered.
+///
+/// Then T58 was split (review, Phase 2 gate): its layout half — the tree dump, the box count and
+/// the timing — runs now as T58, and its pixel half became **T60**, which is ignored. Splitting a
+/// test **re-partitions** the list rather than shrinking it: T58 leaves the ignored set and T60
+/// joins it, so `ignored` stays 26 while `passed` goes 33 → 34 and the list grows to 60. The
+/// review's `34 / 25 / 0` for this gate is off by one for exactly that reason — the same mistake
+/// as the `40 / 19` estimate, one level down. Phase 2's exit is therefore `34 / 26 / 0`, and the
+/// constants here say so.
 ///
 /// Splitting a mixed test to move the number was considered and rejected: T6 was split because its
 /// clause §2.3 is fully satisfiable at the DOM layer, but for T3, T9, T32, T33 and friends the
@@ -112,7 +121,7 @@ fn file_stem(path: &Path) -> String {
         .to_string()
 }
 
-/// T·meta1 — the numbered list is exactly `T1..=T59`, with no gaps and no duplicates.
+/// T·meta1 — the numbered list is exactly `T1..=T60`, with no gaps and no duplicates.
 ///
 /// Why: a gap means a clause lost its test; a duplicate means two tests claim one number and
 /// the coverage check in `TESTS.md` is lying.

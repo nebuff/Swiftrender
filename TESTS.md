@@ -256,7 +256,7 @@ constraint is machine-checked, not aspirational.
 **T54 · module headers** — In: scan `src/**/*.rs` — Out: each file's first line starts with
 `//!`. Why: §10.2 enforced where a test can enforce it.
 
-### H. Robustness (T55–T58)
+### H. Robustness (T55–T58, T60)
 
 **T55 · mismatched end tags** — In: `<div><p>x</div>y` — Out: deterministic tree, `y` text
 present after the div, no panic (§2.6). Why: real-world HTML is broken and we must not crash.
@@ -272,10 +272,23 @@ body, correct order (§2.7). Why: implicit body must capture leading text.
 pinned by T2, T27 and T40 (Phase 2/3). If any of those fail, the layout layer is broken and this
 assertion is moot; at Phase 1 that grounding is specified but not yet running.
 
-**T58 · bulk input guard** — In: 5,000 sibling `<div>`s — Out: renders in < 2 s in release,
-byte-identical across runs, no recursion limit hit. Why: early performance guard against
-accidentally quadratic layout.
+**T58 · bulk input guard** — In: 5,000 sibling `<div>`s — Out: a `--emit tree` dump in under
+2 s, byte-identical across runs, containing all 5,000 divs (5,002 boxes total), no recursion limit
+hit. Why: early performance guard against accidentally quadratic layout.
+
+*Split at the Phase 2 gate, on the T6 precedent.* As approved, T58 asserted pixel determinism,
+which cannot run before paint exists — and so the anti-quadratic guard was absent from exactly the
+layer it protects. The layout half now runs in Phase 2; the paint half is T60. The 2 s budget
+keeps its original number, measured at 0.21 s debug / 0.02 s release on this fixture. The box
+count is not decoration: a quadratic layout can also *drop* boxes silently, and unlike the timing
+it does not depend on how loaded the machine is.
+
+**T60 · bulk pixel determinism** — In: 5,000 sibling `<div>`s — Out: a full render in under 2 s
+producing byte-identical PNGs twice. Why: deterministic layout does not imply deterministic paint
+(iteration order, uninitialised buffers), so the original T58 assertion is repeated at the layer
+it actually describes rather than inherited. Ignores: needs paint.
 
 **Coverage check:** parsing 8, cascade 9, box model 7, block layout 6, inline 10, paint 8,
-output/CLI 7, robustness 4 = **59 tests**, above the 40 minimum, with every SPEC clause §1–§10
-cited at least once. (T59 was added at the Phase 1 gate; see its entry for why.)
+output/CLI 7, robustness 5 = **60 tests**, above the 40 minimum, with every SPEC clause §1–§10
+cited at least once. (T59 was added at the Phase 1 gate, T60 at the Phase 2 gate when T58 split;
+see their entries for why.)
