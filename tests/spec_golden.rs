@@ -16,7 +16,7 @@
 
 mod common;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use common::*;
 
@@ -48,18 +48,19 @@ fn render(name: &str) -> Vec<u8> {
 /// Compare `name`'s render against its approved golden, or fail with the first differing pixels.
 fn compare_with_golden(name: &str) {
     let path = golden_path(name);
-    let expected = std::fs::read(&path).unwrap_or_else(|error| {
-        panic!(
-            "golden {} is missing ({error}).\n\
+    let expected = match read_ppm(&path) {
+        Ok(image) => image,
+        Err(reason) => panic!(
+            "{reason}\n\
              Goldens are committed only after a human has opened the render and approved it; \
              this test is #[ignore]d until then, so reaching this line means it was un-ignored \
-             early (ROADMAP.md, \"Golden files: who signs them\").",
-            path.display()
-        )
-    });
+             early (ROADMAP.md, \"Golden files: who signs them\")."
+        ),
+    };
 
-    let actual = render(name);
-    match compare_ppm(&expected, &actual) {
+    let actual = parse_ppm(&render(name))
+        .unwrap_or_else(|reason| panic!("{name} did not produce a valid PPM: {reason}"));
+    match compare_images(&expected, &actual) {
         Ok(Comparison::Same) => {}
         Ok(Comparison::Different(difference)) => {
             panic!("{name} does not match its approved golden: {difference}")
@@ -168,7 +169,24 @@ fn number(token: &[u8]) -> Result<u32, String> {
         })
 }
 
-/// Compare two images pixel by pixel.
+/// Read and parse an image from disk.
+///
+/// The disk half of the harness is its own failure mode: a wrong path or an unreadable file must
+/// name the path it tried, not surface later as a mysterious paint failure. The golden tests call
+/// this, and so do the tests below — so the file-I/O path is exercised before the first golden
+/// exists, rather than for the first time on the day T61 is un-ignored.
+fn read_ppm(path: &Path) -> Result<Ppm, String> {
+    let bytes = std::fs::read(path).map_err(|error| {
+        format!(
+            "golden {} is missing or unreadable: {error}",
+            path.display()
+        )
+    })?;
+    parse_ppm(&bytes)
+        .map_err(|reason| format!("golden {} is not a valid PPM: {reason}", path.display()))
+}
+
+/// Compare two images pixel by pixel, already parsed.
 ///
 /// `Err` means the inputs could not be compared at all — unparsable bytes or a different canvas —
 /// and is deliberately *not* folded into [`Comparison::Different`]: a caller that only looks for
@@ -184,6 +202,11 @@ fn compare_ppm(expected: &[u8], actual: &[u8]) -> Result<Comparison, String> {
         parse_ppm(expected).map_err(|reason| format!("golden is not a valid PPM: {reason}"))?;
     let actual =
         parse_ppm(actual).map_err(|reason| format!("render is not a valid PPM: {reason}"))?;
+    compare_images(&expected, &actual)
+}
+
+/// The pixel comparison itself, for callers that have already parsed both sides.
+fn compare_images(expected: &Ppm, actual: &Ppm) -> Result<Comparison, String> {
     if (expected.width, expected.height) != (actual.width, actual.height) {
         return Err(format!(
             "canvas is {}x{}, golden is {}x{}",
@@ -295,6 +318,36 @@ fn ppm_parser_rejects_bad_magic() {
 fn ppm_parser_rejects_a_truncated_raster() {
     let error = parse_ppm(b"P6\n2 2\n255\n\0\0\0").expect_err("3 of 12 raster bytes is truncated");
     assert!(error.contains("expected 12"), "{error}");
+}
+
+/// The golden tests read from disk, so the disk path is tested first: a real file, written and read
+/// back, compared with the same function the golden tests call. Without this, the first execution
+/// of the file-I/O half would be the day a golden is un-ignored, and a path bug there would look
+/// like a paint bug.
+#[test]
+fn ppm_roundtrip_through_disk() {
+    let path =
+        std::env::temp_dir().join(format!("swiftrender-roundtrip-{}.ppm", std::process::id()));
+    let bytes = encode_ppm(200, 150, &[(0x12, 0x34, 0x56); 200 * 150]);
+    std::fs::write(&path, &bytes).expect("scratch image is writable");
+
+    let written = parse_ppm(&bytes).expect("encoded PPM parses");
+    let parsed = read_ppm(&path).expect("disk read must succeed");
+    assert!(
+        matches!(compare_images(&written, &parsed), Ok(Comparison::Same)),
+        "a file must compare equal to the bytes that were written to it"
+    );
+    let _ = std::fs::remove_file(&path);
+}
+
+/// A missing golden is an error naming the path, not a panic deep inside a byte parser.
+#[test]
+fn read_ppm_reports_a_missing_file() {
+    let path = std::env::temp_dir().join(format!("swiftrender-absent-{}.ppm", std::process::id()));
+    let _ = std::fs::remove_file(&path);
+    let error = read_ppm(&path).expect_err("a missing file must be an error");
+    assert!(error.contains("missing or unreadable"), "{error}");
+    assert!(error.contains(".ppm"), "the path must be named: {error}");
 }
 
 /// T61 · golden — hello.html. In: the full-feature fixture at 200×150 — Out: pixels identical to

@@ -360,3 +360,18 @@ The golden comparer was reworked so that nothing about it can succeed silently:
 The first of those tests failed when written, because the diff message divided by a 200px constant
 instead of the image's pixel count — a small bug in the one place a small bug is invisible. That is
 the Phase 1 hand-written-vector lesson pointed at the harness instead of the encoder.
+
+**The pattern, named.** Three independent components have now been fixed in the same direction: T6's
+deferred assertion became a tracked test (T59), the comparer's silent "match" became a `Result`, and
+the PPM parser's permissive header became a `Result` too. The rule they share is worth stating
+plainly: **a primitive that cannot fail cannot be trusted.** If a comparer, a parser or an
+assertion has no way to report "I could not do this", its success is indistinguishable from its
+silence, and the suite reads green on the strength of the thing it was supposed to check.
+
+**The disk seam is closed before paint.** The golden tests read their expected image with
+`read_ppm(path) -> Result<Ppm, String>`, and that path is exercised now, not on the day T61 is
+un-ignored: `ppm_roundtrip_through_disk` writes a known 200×150 image, reads it back through the
+same function the golden tests call, and compares it with the same `compare_images`; a companion
+test asserts that a missing file returns an error naming the path. Without those, a path bug in the
+harness would surface during Phase 3 as "paint is broken", and the first hour of the phase would be
+spent debugging the wrong layer.

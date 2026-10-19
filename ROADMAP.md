@@ -67,6 +67,10 @@ Phase 3 is done when **all** of the following hold.
 
 Items 3 and 4 are load-bearing. Everything else is enforced by the harness.
 
+> Phase 3 ends when a human has opened the PNG and confirmed it looks like HTML — not when the
+> tests are green. If those two disagree, the tests are wrong, and that is the most important
+> lesson this project can teach.
+
 ## Golden files: who signs them
 
 The harness (`tests/spec_golden.rs`) is committed **before** paint exists, and it contains no golden
