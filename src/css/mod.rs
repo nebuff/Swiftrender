@@ -12,6 +12,7 @@
 //!
 //! * [`value`] — leaf value types and their parsers,
 //! * [`style`] — the computed style and declaration application,
+//! * [`rule`] — selectors, rules and the one definition of cascade match order,
 //! * [`parse`] — the stylesheet scanner,
 //! * [`cascade`] — origin sheets and per-element resolution,
 //! * [`ua`] — the normative UA sheet,
@@ -20,13 +21,13 @@
 pub mod cascade;
 pub mod explain;
 pub mod parse;
+pub mod rule;
 pub mod style;
 pub mod ua;
 pub mod value;
 
 pub use cascade::Css;
-pub use parse::{
-    matching_rules, parse, parse_declarations, Declaration, Rule, Selector, Stylesheet,
-};
+pub use parse::{parse, parse_declarations};
+pub use rule::{matching_rules, Declaration, Rule, Selector, Stylesheet};
 pub use style::ComputedStyle;
 pub use value::{BorderStyle, Color, Display, Edges, LineHeight, TextAlign};
