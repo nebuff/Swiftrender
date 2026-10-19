@@ -33,11 +33,11 @@ the y≈26 and y≈46 bands. Why: §5.5 forced break without a closing tag.
 **T5 · entity decoding** — In: `<p>&amp;&lt;&#65;</p>` — Out: text `"&<A"`, run width 24. Why:
 §2.4 numeric and named entities change measured width.
 
-*Layer note (added at the Phase 1 gate):* the text half is §2.4 and runs from Phase 1. The
-`24` follows from §6.6 rather than being separately asserted: `advance = max(1, round(16/2)) = 8`,
-and three glyphs therefore measure 24. The formula itself is pinned by T2 (two glyphs → 16),
-T27 (font-size 32 → 16 per glyph) and T40 (three glyphs including a space → 24), so this width
-is derived from tested rules, not asserted nowhere.
+*Layer note (added at the Phase 1 gate, reworded at review):* the text half is §2.4 and runs from
+Phase 1. The `24` follows from the §6.6 advance formula, independently pinned by T2, T27 and T40
+(Phase 2/3): if any of those fail, the whole layout layer is broken and this assertion is moot.
+At Phase 1 that grounding is *specified but not yet running*, which is why this is recorded as a
+derivation with its dependencies named rather than as a passing assertion.
 
 **T6 · multiple classes** — In: `<style>.b{color:#00ff00}</style><div class="a b">x</div>` —
 Out: text pixels `#00ff00`. Why: §2.3/§3.2 class attribute splits on whitespace and any single
@@ -246,8 +246,10 @@ body, correct order (§2.7). Why: implicit body must capture leading text.
 **T57 · unknown entity stays literal** — In: `<p>&bogus;</p>` — Out: text `"&bogus;"`, width
 56. Why: §2.4 must not silently drop characters.
 
-*Layer note (added at the Phase 1 gate):* as with T5, the literal-text half is §2.4 and runs from
-Phase 1; `56` is `7 × 8`, derived from the same §6.6 advance formula that T2, T27 and T40 pin.
+*Layer note (added at the Phase 1 gate, reworded at review):* as with T5, the literal-text half is
+§2.4 and runs from Phase 1; `56` is `7 × 8`, following from the §6.6 advance formula independently
+pinned by T2, T27 and T40 (Phase 2/3). If any of those fail, the layout layer is broken and this
+assertion is moot; at Phase 1 that grounding is specified but not yet running.
 
 **T58 · bulk input guard** — In: 5,000 sibling `<div>`s — Out: renders in < 2 s in release,
 byte-identical across runs, no recursion limit hit. Why: early performance guard against

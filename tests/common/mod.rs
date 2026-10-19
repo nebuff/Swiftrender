@@ -163,6 +163,12 @@ pub struct BoxInfo {
 /// `BoxInfo` fields are exact `i32` values because §6.7 snaps geometry once, before the tree is
 /// printed: there is no tolerance to apply and no float to compare.
 ///
+/// **Do not "optimize" this into a library call.** The point is that a human reading
+/// `--emit tree` and a test asserting on the same bytes cannot disagree; routing the assertion
+/// through an internal struct would recreate exactly the gap this helper exists to close. This
+/// decision was reviewed and confirmed at the Phase 1 gate, so changing it needs a reason that
+/// beats that one in a commit message.
+///
 /// Panics until Phase 2 implements layout; every caller is `#[ignore]`d until then.
 pub fn boxes(_html: &str) -> Vec<BoxInfo> {
     unimplemented!("layout arrives in phase 2 (SPEC.md §5-§6)")

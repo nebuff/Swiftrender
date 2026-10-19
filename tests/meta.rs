@@ -15,12 +15,35 @@ const EXPECTED_SPEC_TESTS: usize = 59;
 
 /// How many numbered tests are `#[ignore]`d at this phase.
 ///
-/// * Phase 1: **49** (T1–T4, T9–T51, T58, T59 wait on layout and paint).
-/// * Phase 2 target: **19** — the cascade and layout tests begin running.
-/// * Phase 3 target: **0**.
+/// * Phase 1: **49**.
+/// * Phase 2: **26** — the 23 tests that assert only box geometry stop being ignored; see the
+///   budget note below for why the number is 26 and not the 19 that was guessed at the gate.
+/// * Phase 3: **0**.
 ///
 /// Bumping this constant is a deliberate, reviewable act: it can only go down as work lands, and
 /// it can only go up if a new test is added, never because a test started failing.
+///
+/// # Phase 2 budget, derived rather than estimated
+///
+/// Of the 49 currently-ignored tests, **26 assert pixel output** and therefore cannot pass before
+/// Phase 3, whatever Phase 2 accomplishes:
+///
+/// ```text
+/// T3  T9  T16 T21 T23 T28 T32 T33 T34 T35 T36 T37 T38 T59     (layout+paint cases)
+/// T41 T42 T43 T44 T45 T46 T47                                 (paint-only)
+/// T48 T49 T50 T51 T58                                         (artifact and perf cases)
+/// ```
+///
+/// That leaves **23** tests that Phase 2 can flip: T1, T2, T4, T10–T15, T17–T20, T22, T24–T27,
+/// T29–T31, T39, T40. Phase 2's exit is therefore `passed == 33, ignored == 26, failed == 0`, not
+/// the `40 / 19` assumed when the gate was set. The count is derived by scanning the test bodies
+/// for pixel helpers (`raster`, `has_ink`, `ppm_bytes`, `png_bytes`, `svg_text`), so it can be
+/// re-derived at any time instead of remembered.
+///
+/// Splitting a mixed test to move the number was considered and rejected: T6 was split because its
+/// clause §2.3 is fully satisfiable at the DOM layer, but for T3, T9, T32, T33 and friends the
+/// painted line *is* the clause ("a forced break paints two lines", "class beats tag"), and a
+/// half-test asserting only `p.height == 40` would assert less than the spec promises.
 const EXPECTED_IGNORED: usize = 49;
 
 /// One numbered test found in the `spec_*.rs` files.

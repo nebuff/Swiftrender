@@ -87,3 +87,44 @@ invisible to anyone reading the contract.
 verifier) turned into work, and the one item it did not self-report (T6) was caught by a human
 reading the passing list against the phase boundary. The passing list is the artifact to audit,
 not the summary around it.
+
+## 4. Phase 1 accepted; three items fixed before Phase 2
+
+**Human:** accepted `de211f0`, asked for the tokenizer fuzz loop, asked for the T5/T57 wording to
+be precise about *when* their grounding tests run, and asked to see the second idea the agent had
+said it was holding back. Also set a Phase 2 exit criterion of `passed == 40, ignored == 19`.
+
+**Deferral policy (now explicit, governs future phases):** an assertion that depends on two
+independently-wrong-able layers (cascade + paint) must be a **tracked test**; an assertion that is
+a strict arithmetic consequence of a rule already pinned elsewhere may be recorded as a
+**derivation with the pinning tests cited**.
+
+**Work landed:**
+
+* `tests/fuzz_parse.rs` — an in-tree LCG fuzz loop, no crate, fixed seeds, `catch_unwind` so a panic
+  is reported with the input that caused it instead of aborting. 16,000 short documents across 8
+  seeds plus 50 runs at 64 KiB each, asserting four invariants: the root is always `html`, node
+  count stays `<= input + 8` (the anti-quadratic check), total text stays `<= input + 1`, and depth
+  never exceeds the §2.10 cap. Two hours of work, no panic found — which is itself the result.
+* T5 and T57's layer notes now say their widths *follow from the §6.6 formula independently pinned
+  by T2, T27 and T40 (Phase 2/3)*, and state plainly that at Phase 1 that grounding is specified
+  but not running. The earlier wording — "derived from tested rules" — overstated it.
+* `tests/common/mod.rs` now carries the reason `boxes()` must go through the real binary, marked
+  as reviewed and as needing a better argument in a commit message to change.
+
+**The second idea, surfaced as requested:** a CI workflow (GitHub Actions) running `cargo fmt
+--check`, `cargo clippy -- -D warnings` and `cargo test` on push. It was withheld from the previous
+message only because the phase boundary was the wrong moment to spend attention on it; nothing
+about it is confidential.
+
+**Phase 2 exit criterion, corrected by measurement:** the gate's `40 / 19` assumed roughly 30 of the
+49 ignored tests would flip. Scanning the test bodies for pixel helpers shows **26 assert pixels**
+and cannot pass before Phase 3, leaving **23** that Phase 2 can flip. The honest exit is therefore
+`passed == 33, ignored == 26, failed == 0`, recorded with its derivation in `tests/meta.rs`.
+Splitting the 12 mixed tests to force a friendlier number was considered and rejected: T6 was
+split because its clause §2.3 is fully satisfied at the DOM layer, whereas for T3/T9/T32 the
+painted line *is* the clause.
+
+**Process note worth keeping:** the agent's own arithmetic was wrong (it said 24 paint-gated tests;
+the awk scan said 26, because T9 and T16 carry raster assertions it had forgotten). The lesson is
+the same one as T6, one level down: derive counts from artifacts, never from memory.
