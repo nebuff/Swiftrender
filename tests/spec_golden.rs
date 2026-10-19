@@ -24,9 +24,6 @@ use common::*;
 /// margins, padding, borders and text.
 const CANVAS: &str = "200x150";
 
-/// Width of [`CANVAS`], used to turn a byte offset into a pixel coordinate.
-const CANVAS_WIDTH: u32 = 200;
-
 /// Where the approved golden for `name` lives.
 fn golden_path(name: &str) -> PathBuf {
     manifest_dir()
@@ -173,7 +170,7 @@ fn diff_pixels(expected: &[u8], actual: &[u8]) -> Option<String> {
     let y = index as u32 / expected.width;
     Some(format!(
         "{differing} of {} pixels differ; first at ({x}, {y}): golden #{:02x}{:02x}{:02x}, actual #{:02x}{:02x}{:02x} (canvas {}x{})",
-        CANVAS_WIDTH * expected.height,
+        expected.width * expected.height,
         want[0],
         want[1],
         want[2],
@@ -183,6 +180,55 @@ fn diff_pixels(expected: &[u8], actual: &[u8]) -> Option<String> {
         expected.width,
         expected.height
     ))
+}
+
+/// Encode a P6 PPM from RGB triples, for testing the comparer without a renderer.
+fn encode_ppm(width: u32, height: u32, pixels: &[(u8, u8, u8)]) -> Vec<u8> {
+    assert_eq!(pixels.len(), (width * height) as usize);
+    let mut bytes = format!("P6\n{width} {height}\n255\n").into_bytes();
+    for (r, g, b) in pixels {
+        bytes.extend_from_slice(&[*r, *g, *b]);
+    }
+    bytes
+}
+
+/// The comparer is the one piece of this harness whose failure mode is **silent**: a diff that
+/// always answered "equal" would make every golden test pass on a wrong render. So it is tested
+/// against synthetic images now, rather than first being exercised by the goldens it judges.
+#[test]
+fn diff_reports_the_first_differing_pixel() {
+    let white = (255, 255, 255);
+    let golden = encode_ppm(2, 1, &[white, (0, 0, 0)]);
+    let rendered = encode_ppm(2, 1, &[white, (1, 2, 3)]);
+
+    assert_eq!(
+        diff_pixels(&golden, &golden),
+        None,
+        "identical images match"
+    );
+
+    let message = diff_pixels(&golden, &rendered).expect("a changed pixel must be reported");
+    assert!(message.contains("1 of 2 pixels differ"), "{message}");
+    assert!(
+        message.contains("(1, 0)"),
+        "the coordinate must be named: {message}"
+    );
+    assert!(
+        message.contains("#000000") && message.contains("#010203"),
+        "both colours must be reported: {message}"
+    );
+}
+
+/// A different canvas is a different image, and must not be reported as "equal but shorter".
+#[test]
+fn diff_reports_a_canvas_mismatch() {
+    let small = encode_ppm(1, 1, &[(0, 0, 0)]);
+    let large = encode_ppm(2, 1, &[(0, 0, 0), (0, 0, 0)]);
+    let message = diff_pixels(&small, &large).expect("a canvas change must be reported");
+    assert!(
+        message.contains("2x1") && message.contains("1x1"),
+        "{message}"
+    );
 }
 
 /// T61 · golden — hello.html. In: the full-feature fixture at 200×150 — Out: pixels identical to

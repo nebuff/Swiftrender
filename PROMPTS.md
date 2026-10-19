@@ -312,3 +312,13 @@ keeps the zero-dependency premise intact.
 `ignored` is now 29 = the 26 pixel-gated tests + 3 goldens, so Phase 2.75 sits at `34/29/0`. That is
 the fifth count in this project derived from prose and the fifth that needed the scan to correct it,
 which is exactly why §8 exists and why `ROADMAP.md` states the number with its composition.
+
+**The comparer was tested before it was trusted, and it failed.** `diff_pixels` is the one piece of
+the harness whose failure mode is silent: a diff that always answered "equal" would make every
+golden pass on a wrong render, and `63/0/0` would mean nothing. Two synthetic-image tests were
+added (`diff_reports_the_first_differing_pixel`, `diff_reports_a_canvas_mismatch`), and the first
+one immediately failed — not because the comparison was wrong, but because the *message* divided by
+`CANVAS_WIDTH * height`, a 200px proxy instead of the image's own pixel count, so a 2-pixel image
+reported "1 of 200 pixels differ". The constant is gone; the count comes from the parsed image. It
+is the Phase 1 hand-written-vector lesson again, this time pointed at the harness rather than at the
+encoder: a test fixture that is wrong is cheap to find now and expensive to find later.
