@@ -14,15 +14,19 @@
 //! * [`style`] — the computed style and declaration application,
 //! * [`parse`] — the stylesheet scanner,
 //! * [`cascade`] — origin sheets and per-element resolution,
-//! * [`ua`] — the normative UA sheet.
+//! * [`ua`] — the normative UA sheet,
+//! * [`explain`] — the `--explain` report (§9.4), a debugging aid and not part of the contract.
 
 pub mod cascade;
+pub mod explain;
 pub mod parse;
 pub mod style;
 pub mod ua;
 pub mod value;
 
 pub use cascade::Css;
-pub use parse::{parse, parse_declarations, Declaration, Rule, Selector, Stylesheet};
+pub use parse::{
+    matching_rules, parse, parse_declarations, Declaration, Rule, Selector, Stylesheet,
+};
 pub use style::ComputedStyle;
 pub use value::{BorderStyle, Color, Display, Edges, LineHeight, TextAlign};

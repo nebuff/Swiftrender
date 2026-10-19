@@ -5,6 +5,8 @@
 //! removes the entire rule and records why, so `--verbose` can show a reader exactly which line
 //! of their CSS the engine ignored (`SPEC.md` §3.2, §9.3).
 
+use std::fmt;
+
 use super::style::ComputedStyle;
 use crate::html::Node;
 
@@ -71,6 +73,21 @@ impl Selector {
         let classes = u32::from(self.class.is_some());
         let tags = u32::from(self.tag.is_some());
         classes * 16 + tags
+    }
+}
+
+/// Render a selector back to the text a stylesheet would have used.
+///
+/// Used by `--explain`, which quotes the rule as written rather than describing it in prose.
+impl fmt::Display for Selector {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(tag) = &self.tag {
+            write!(f, "{tag}")?;
+        }
+        if let Some(class) = &self.class {
+            write!(f, ".{class}")?;
+        }
+        Ok(())
     }
 }
 
@@ -265,19 +282,14 @@ pub fn parse_author(fragments: &[String], warnings: &mut Vec<String>) -> Stylesh
     sheet
 }
 
-/// Apply every declaration of `sheet` that matches `element`, in ascending precedence.
+/// Every rule of `sheet` that matches `element`, in the order the cascade applies them.
 ///
-/// Returns the number of declarations applied. Precedence is (origin, specificity, source
-/// order), so the caller can feed the UA sheet first and the author sheet second and rely on
-/// later, more specific declarations overwriting earlier ones (`SPEC.md` §3.3, §3.4).
-pub fn apply_sheet(
-    sheet: &Stylesheet,
-    element: &Node,
-    style: &mut ComputedStyle,
-    parent: Option<&ComputedStyle>,
-    warnings: &mut Vec<String>,
-) {
-    let mut matched: Vec<(u32, usize, &Declaration)> = Vec::new();
+/// Ascending `(specificity, source order)`, so the last entry wins (`SPEC.md` §3.3). This is the
+/// single definition of "cascade order": [`apply_sheet`] applies it, and `--explain` reports it
+/// (`super::explain`). A second copy of the sort in the explainer would be a second source of
+/// truth, and the first thing a debugging aid must not do is lie about the thing it explains.
+pub fn matching_rules<'a>(sheet: &'a Stylesheet, element: &Node) -> Vec<(u32, usize, &'a Rule)> {
+    let mut matched: Vec<(u32, usize, &Rule)> = Vec::new();
     for (index, rule) in sheet.rules.iter().enumerate() {
         let best = rule
             .selectors
@@ -286,15 +298,30 @@ pub fn apply_sheet(
             .map(Selector::score)
             .max();
         if let Some(score) = best {
-            for declaration in &rule.declarations {
-                matched.push((score, index, declaration));
-            }
+            matched.push((score, index, rule));
         }
     }
     matched.sort_by_key(|(score, index, _)| (*score, *index));
-    for (_, _, declaration) in matched {
-        if let Err(reason) = style.apply(&declaration.name, &declaration.value, parent) {
-            warnings.push(format!("<{}> {reason}", element.name));
+    matched
+}
+
+/// Apply every declaration of `sheet` that matches `element`, in ascending precedence.
+///
+/// Precedence is (origin, specificity, source order), so the caller can feed the UA sheet first
+/// and the author sheet second and rely on later, more specific declarations overwriting earlier
+/// ones (`SPEC.md` §3.3, §3.4). Dropped declarations are reported through `warnings` (§3.8).
+pub fn apply_sheet(
+    sheet: &Stylesheet,
+    element: &Node,
+    style: &mut ComputedStyle,
+    parent: Option<&ComputedStyle>,
+    warnings: &mut Vec<String>,
+) {
+    for (_, _, rule) in matching_rules(sheet, element) {
+        for declaration in &rule.declarations {
+            if let Err(reason) = style.apply(&declaration.name, &declaration.value, parent) {
+                warnings.push(format!("<{}> {reason}", element.name));
+            }
         }
     }
 }

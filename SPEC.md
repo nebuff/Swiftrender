@@ -203,6 +203,7 @@ a      { color: #0000ee }
 
 ```
 swiftrender <INPUT.html> [--emit tree|ppm|png|svg] [--out PATH] [--size WxH] [--verbose]
+            [--explain SELECTOR]
 ```
 
 - **§9.1** `--emit` defaults to `png`; `--out` defaults to stdout for `tree`, else
@@ -210,6 +211,13 @@ swiftrender <INPUT.html> [--emit tree|ppm|png|svg] [--out PATH] [--size WxH] [--
 - **§9.2** Exit `0` success, `2` usage error (missing arg, bad flag, bad `--size`), `1` I/O
   failure (missing/unreadable/unwritable file). Malformed HTML MUST NOT be an error.
 - **§9.3** `--verbose` sends dropped-rule/dropped-declaration warnings to **stderr**.
+- **§9.4** *(added in Phase 2.5)* `--explain SELECTOR` is a **debugging aid, not part of the
+  artifact contract**. `SELECTOR` is a tag, `.class` or `tag.class` (§3.2), validated at usage
+  time, so an unsupported selector is exit `2`. The run prints, for every matching element, the
+  rules that matched in cascade order, each declaration's outcome (applied, or dropped with the
+  reason), and the resulting computed style; then exits `0`. It ignores `--emit` and still
+  honours `--out`. Its **text format is deliberately unpinned** — one meta-test asserts shape, no
+  numbered test asserts content — because it is expected to grow as the engine does.
 
 ## 10. Code quality (self-enforced)
 

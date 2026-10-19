@@ -214,3 +214,60 @@ memory instead of from the artifacts. `tests/meta.rs` still derives its budget f
 **Scheduled for Phase 2.5:** `--explain <selector>`, a cascade debugging aid showing matched rules
 in specificity order with dropped declarations and why. Scoped by the review to one meta-test only;
 it is a debugging tool, not part of the artifact's contract.
+
+## 7. Tools that lie (append-only)
+
+Every entry is a signal that read as green while not meaning what the summary claimed. The fixes
+are local; the failure mode is general, which is why they are written down.
+
+1. **`cargo test` without `--no-fail-fast`** — cargo stops at the first failing test *binary*, so
+   a run with 31 failures reported "only three" in Phase 2. Fix: always pass `--no-fail-fast`, and
+   read the `test result:` lines rather than the exit code alone.
+2. **Piping cargo output through a filter** — `cmd | grep …` then `echo $?` reports the *filter's*
+   status. That happened in the Phase 2 gate report: "TEST=0" was `grep`, and the suite's own
+   status had never been captured at all. Fix: `set -o pipefail`, or redirect to a file and check
+   the command's own status.
+3. **A test that asserts half a clause and defers the rest to a comment** — reads as fully green
+   (T6, Phase 1; the same pattern was then found twice more in T5 and T57). Fix: if a clause has N
+   assertions, the test has N assertions, and deferrals become tracked tests (the T59 pattern).
+
+## 8. Count rule
+
+Any number about the test suite must be produced by a scan of the files, never by arithmetic on a
+previous number. Four consecutive slips make the case: `40/19` and `34/25/0` from the reviewer,
+`24`-vs-`26` and `25`-vs-`26` from the agent — every one of them reasoning in prose instead of
+counting artifacts. `tests/meta.rs` derives its budget by scanning `spec_*.rs`; prose must do the
+same before it states a number.
+
+## 9. Phase 2.5 — `--explain`
+
+Built as scheduled, in one module (`src/css/explain.rs`) plus a CLI flag, with the scope the gate
+set: small, off the critical path, one meta-test.
+
+**What it does.** `swiftrender page.html --explain p.note` walks the document in document order
+carrying each element's computed style, and for every matching element prints the rules that
+matched in **cascade order**, each declaration's outcome (`applied`, or `dropped` with the reason),
+and the resulting computed style. An unsupported selector is a usage error (exit `2`); a selector
+that matches nothing says so explicitly rather than printing an empty report, because silence
+reads as success and that is the one failure mode a debugging aid cannot afford.
+
+**One ordering, two consumers.** `parse::matching_rules` was extracted so `apply_sheet` and the
+explainer share the single definition of cascade order. Re-implementing the sort inside the
+explainer would have made a debugging tool that can disagree with the renderer about the thing it
+explains. The report also replays the cascade into a scratch style and `debug_assert_eq!`s it
+against the style `style_for` actually computed, so drift between the two is a test failure rather
+than a plausible-looking lie.
+
+**Format deliberately unpinned.** One meta-test (`meta_explain_runs_and_reports_structure`) asserts
+exit status, non-empty output, the structural markers (`element `, `matched rule`, `dropped`) and
+the no-match message. Nothing asserts exact wording, and no numbered test references `--explain`:
+it is a tool, not an artifact, and freezing its text would make every future improvement a
+documentation chore.
+
+**Why `33b9c16` was not amended.** The gate asked for its "Phase 1" message to be corrected, or the
+decision documented. It is documented: the commit is reachable from `origin/main`, so rewording it
+means a force-push of shared history — destructive, and not something to do on the strength of a
+review note. The reflog additionally shows a reset followed by a re-commit (`4da0c0d`, identical
+tree) after the gate commit was made, so the branch has already been rewritten once locally; adding
+another rewrite would make the log harder to trust, not easier. The mapping in §6 stands as the
+record: `33b9c16` contains Phase 2.

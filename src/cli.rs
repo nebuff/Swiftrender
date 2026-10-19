@@ -6,6 +6,8 @@
 
 use std::fmt;
 
+use crate::css::parse::Selector;
+
 /// The artifact a run should produce (`--emit`, `SPEC.md` §1.6).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Emit {
@@ -67,6 +69,11 @@ pub struct Options {
     pub size: (u32, u32),
     /// Whether warnings should be printed to stderr (`--verbose`, §9.3).
     pub verbose: bool,
+    /// Selector to explain instead of rendering (`--explain`, §9.4).
+    ///
+    /// When this is set the run is a debugging aid: it ignores `--emit`, prints the cascade report
+    /// where the artifact would have gone, and still honours `--out`.
+    pub explain: Option<String>,
 }
 
 /// Usage errors. All of these map to exit code `2` (`SPEC.md` §9.2).
@@ -84,6 +91,8 @@ pub enum CliError {
     BadSize(String),
     /// A second positional argument appeared.
     UnexpectedArgument(String),
+    /// `--explain` was given a selector outside the supported subset (§3.2).
+    BadSelector(String),
 }
 
 impl fmt::Display for CliError {
@@ -102,12 +111,16 @@ impl fmt::Display for CliError {
                 write!(f, "bad --size value {value:?} (expected WxH, e.g. 800x600)")
             }
             CliError::UnexpectedArgument(value) => write!(f, "unexpected argument {value:?}"),
+            CliError::BadSelector(value) => write!(
+                f,
+                "unsupported --explain selector {value:?} (expected p, .class or p.class)"
+            ),
         }
     }
 }
 
 /// Usage line printed alongside every [`CliError`].
-pub const USAGE: &str = "usage: swiftrender <INPUT.html> [--emit tree|ppm|png|svg] [--out PATH] [--size WxH] [--verbose]";
+pub const USAGE: &str = "usage: swiftrender <INPUT.html> [--emit tree|ppm|png|svg] [--out PATH] [--size WxH] [--verbose] [--explain SELECTOR]";
 
 /// Parse `args`, which must exclude `argv[0]`.
 ///
@@ -125,6 +138,7 @@ pub fn parse(args: &[String]) -> Result<Options, CliError> {
         out: None,
         size: crate::DEFAULT_SIZE,
         verbose: false,
+        explain: None,
     };
     let mut input: Option<String> = None;
 
@@ -150,6 +164,17 @@ pub fn parse(args: &[String]) -> Result<Options, CliError> {
             "--verbose" => {
                 opts.verbose = true;
                 i += 1;
+            }
+            "--explain" => {
+                let value = value_of(args, i, "--explain")?;
+                // Validate here rather than in `main`: an unsupported selector is a usage error
+                // (§9.2), and catching it before the file is read keeps the error cheap and the
+                // exit code unambiguous.
+                if Selector::parse(value).is_none() {
+                    return Err(CliError::BadSelector(value.to_string()));
+                }
+                opts.explain = Some(value.to_string());
+                i += 2;
             }
             "--" => {
                 i += 1;
@@ -222,6 +247,20 @@ mod tests {
         let opts = parse(&args(&["--verbose", "--size", "10x20", "a.html"])).unwrap();
         assert_eq!(opts.size, (10, 20));
         assert_eq!(opts.input, "a.html");
+    }
+
+    #[test]
+    fn explain_accepts_the_selector_subset_and_rejects_the_rest() {
+        let opts = parse(&args(&["a.html", "--explain", "p.note"])).unwrap();
+        assert_eq!(opts.explain.as_deref(), Some("p.note"));
+        assert_eq!(
+            parse(&args(&["a.html", "--explain", "#x"])),
+            Err(CliError::BadSelector("#x".into()))
+        );
+        assert_eq!(
+            parse(&args(&["a.html", "--explain"])),
+            Err(CliError::MissingValue("--explain".into()))
+        );
     }
 
     #[test]

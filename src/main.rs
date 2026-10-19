@@ -7,7 +7,7 @@
 use std::process::ExitCode;
 
 use swiftrender::cli::{self, CliError, Emit, Options};
-use swiftrender::css::Css;
+use swiftrender::css::{explain, parse::Selector, Css};
 use swiftrender::html;
 use swiftrender::layout;
 
@@ -53,13 +53,19 @@ fn run(args: &[String]) -> ExitCode {
     let mut warnings = document.warnings.clone();
     let (width, height) = options.size;
     let css = Css::from_document(&document, &mut warnings);
-    let tree = layout::layout_document(&document, &css, width, height, &mut warnings);
 
-    if options.verbose {
-        for warning in &warnings {
-            eprintln!("swiftrender: warning: {warning}");
-        }
+    // §9.4: `--explain` answers a question about styles, so it runs before layout — there is no
+    // reason to lay the document out to explain why a declaration lost.
+    if let Some(query) = &options.explain {
+        let selector =
+            Selector::parse(query).expect("the CLI rejects selectors outside the subset (§9.2)");
+        let report = explain::explain(&document, &css, &selector);
+        print_warnings(&options, &warnings);
+        return write_output(&options, report.as_bytes());
     }
+
+    let tree = layout::layout_document(&document, &css, width, height, &mut warnings);
+    print_warnings(&options, &warnings);
 
     let text = match options.emit {
         Emit::Tree => layout::dump_tree(&tree),
@@ -73,6 +79,15 @@ fn run(args: &[String]) -> ExitCode {
     };
 
     write_output(&options, text.as_bytes())
+}
+
+/// Print collected warnings to stderr when `--verbose` is set (§9.3).
+fn print_warnings(options: &Options, warnings: &[String]) {
+    if options.verbose {
+        for warning in warnings {
+            eprintln!("swiftrender: warning: {warning}");
+        }
+    }
 }
 
 /// Write `bytes` to `--out`, or to stdout when no path was given.

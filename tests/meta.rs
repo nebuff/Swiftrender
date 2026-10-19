@@ -8,7 +8,11 @@
 //! These are deliberately **not** numbered spec tests: the numbered list is the contract with
 //! `SPEC.md`, and meta-tests would muddy the count.
 
+mod common;
+
 use std::path::{Path, PathBuf};
+
+use common::run_cli;
 
 /// Number of numbered tests defined by `TESTS.md` (T59 was added at the Phase 1 gate, T60 at the
 /// Phase 2 gate when T58 was split).
@@ -156,6 +160,47 @@ fn meta_ignored_count_matches_the_phase() {
         EXPECTED_IGNORED,
         "ignored count changed; if work landed, lower EXPECTED_IGNORED deliberately. Currently ignored: {:#?}",
         ignored.iter().map(|test| &test.name).collect::<Vec<_>>()
+    );
+}
+
+/// T·meta4 — `--explain` runs, and reports structure rather than exact wording.
+///
+/// Why: `--explain` is a debugging aid outside the artifact contract (`SPEC.md` §9.4), scoped at
+/// the Phase 2.5 gate to exactly one meta-test. Asserting its text would freeze a format that is
+/// expected to grow, so this checks only that it succeeds, says something, and contains the
+/// markers that make a report legible. Everything around those markers is free to change.
+#[test]
+fn meta_explain_runs_and_reports_structure() {
+    let fixture = "<style>p.note { color: #123456; width: 50% }</style><p class=\"note\">x</p>";
+
+    let output = run_cli(fixture, &["--explain", "p.note"]);
+    assert!(
+        output.status.success(),
+        "--explain must exit 0 on a matched selector"
+    );
+    let text = String::from_utf8_lossy(&output.stdout);
+    assert!(!text.trim().is_empty(), "--explain must say something");
+    assert!(text.contains("element "), "no element header in:\n{text}");
+    assert!(
+        text.contains("matched rule"),
+        "no matched rules in:\n{text}"
+    );
+    assert!(
+        text.contains("dropped"),
+        "the unsupported `width: 50%` must be reported as dropped:\n{text}"
+    );
+
+    // A selector that matches nothing must say so: an empty report reads as success and is the
+    // one failure mode a debugging aid cannot afford.
+    let absent = run_cli(fixture, &["--explain", ".absent"]);
+    assert!(
+        absent.status.success(),
+        "a non-matching selector is not an error"
+    );
+    assert!(
+        String::from_utf8_lossy(&absent.stdout).contains("no element matches"),
+        "silence is not an answer:\n{}",
+        String::from_utf8_lossy(&absent.stdout)
     );
 }
 
