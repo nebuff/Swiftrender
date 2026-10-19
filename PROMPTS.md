@@ -322,3 +322,41 @@ one immediately failed — not because the comparison was wrong, but because the
 reported "1 of 200 pixels differ". The constant is gone; the count comes from the parsed image. It
 is the Phase 1 hand-written-vector lesson again, this time pointed at the harness rather than at the
 encoder: a test fixture that is wrong is cheap to find now and expensive to find later.
+
+## 11. File-write discipline (append-only)
+
+A write tool that reports "Created file successfully" does not distinguish create from replace.
+`ROADMAP.md` was destroyed once by exactly that ambiguity, so the rule is mechanical:
+
+1. `git ls-files --error-unmatch <path>` — if it exits `0`, the file is tracked: you are editing,
+   not creating.
+2. If editing, read the current content first. If the new content is shorter than the old and the
+   reason is not known, stop.
+3. After writing, `git status --short` — ` M` (tracked, modified) versus `??` (untracked, new) says
+   what actually happened, whatever the tool reported.
+4. Before committing, `git diff --stat` — a deletion count that cannot be explained is a bug, not a
+   refactor.
+
+The same rule for generated documents as for source: an exit code from `write_file` is not evidence
+that the file's previous contents survived.
+
+## 12. Comparer hardening (Phase 2.75 close-out)
+
+The golden comparer was reworked so that nothing about it can succeed silently:
+
+* `parse_ppm` returns `Result<Ppm, String>` — bad magic, non-ASCII or non-numeric header tokens,
+  `maxval != 255`, a zero dimension, and a truncated raster are all errors. Previously these were
+  `assert!`s, which is a rejection only if something catches the panic.
+* `compare_ppm` returns `Result<Comparison, String>`: `Err` for unparsable input **and for a canvas
+  mismatch**, `Ok(Same)`, or `Ok(Different(message))`. A canvas mismatch is refused rather than
+  zipped to the shorter image, because zipping makes a render that is too tall with blank extra rows
+  compare as equal — the exact silent pass the harness exists to prevent.
+* Five synthetic-image tests now pin the comparer without needing a renderer: identical images
+  match, a changed pixel is reported with coordinate and both colours, a canvas mismatch is
+  rejected with both sizes named, and the parser rejects both a wrong magic and a short raster.
+* A sixth test in `tests/meta.rs` runs `--explain` on every fixture, extending the cascade-replay
+  `debug_assert` from one fixture to three. Still exit-status only, per §9.
+
+The first of those tests failed when written, because the diff message divided by a 200px constant
+instead of the image's pixel count — a small bug in the one place a small bug is invisible. That is
+the Phase 1 hand-written-vector lesson pointed at the harness instead of the encoder.

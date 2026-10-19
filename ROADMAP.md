@@ -50,7 +50,9 @@ Phase 3 is done when **all** of the following hold.
 1. `cargo test --no-fail-fast` reports **63 passed / 0 ignored / 0 failed**: the 60 numbered clause
    tests plus the three golden regression tests (T61–T63). This criterion was written as `60/0/0`
    before the golden tests existed; adding tests re-partitions the list rather than leaving the
-   total alone, which is the arithmetic lesson of `PROMPTS.md` §8 one more time.
+   total alone, which is the arithmetic lesson of `PROMPTS.md` §8 one more time. The number is
+   **derived by the `meta.rs` scan**; any hand-count must be reconciled against that scan before
+   this gate closes.
 2. `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` both exit `0`.
 3. **A human has opened a generated PNG in an external viewer and confirmed it looks like a
    rendered HTML page.** This is the one check no test can replace. If the tests pass and the image

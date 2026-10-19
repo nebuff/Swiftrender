@@ -213,6 +213,32 @@ fn meta_explain_runs_and_reports_structure() {
     );
 }
 
+/// T·meta5 — `--explain` succeeds on every fixture, not just the one the meta-test uses.
+///
+/// Why: the report replays the cascade and `debug_assert`s the replay against the style the
+/// engine computed, so every fixture explained is a fixture whose cascade ordering is
+/// cross-checked. Exit status only — the text is a debugging aid (`SPEC.md` §9.4), and asserting
+/// on it would freeze a format that is expected to grow.
+#[test]
+fn meta_explain_runs_on_every_fixture() {
+    let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("fixtures");
+    for (name, selector) in [
+        ("hello", ".center"),
+        ("list", ".note"),
+        ("boxes", ".center"),
+    ] {
+        let path = fixtures.join(format!("{name}.html"));
+        let html = std::fs::read_to_string(&path)
+            .unwrap_or_else(|error| panic!("fixture {}: {error}", path.display()));
+        let output = run_cli(&html, &["--explain", selector]);
+        assert!(
+            output.status.success(),
+            "--explain {selector} failed on {name}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+}
+
 /// T·meta3 — every `#[ignore]` names the phase that will remove it.
 ///
 /// Why: an untagged ignore is indistinguishable from a test someone quietly gave up on.

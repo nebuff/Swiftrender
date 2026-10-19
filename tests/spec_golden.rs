@@ -59,12 +59,28 @@ fn compare_with_golden(name: &str) {
     });
 
     let actual = render(name);
-    if let Some(difference) = diff_pixels(&expected, &actual) {
-        panic!("{name} does not match its approved golden: {difference}");
+    match compare_ppm(&expected, &actual) {
+        Ok(Comparison::Same) => {}
+        Ok(Comparison::Different(difference)) => {
+            panic!("{name} does not match its approved golden: {difference}")
+        }
+        // A canvas or format mismatch is not "a difference to report" — it is a comparison that
+        // cannot be trusted, and the caller has to say so rather than treat it as a pass.
+        Err(reason) => panic!("{name} could not be compared: {reason}"),
     }
 }
 
+/// The outcome of comparing two images.
+#[derive(Debug)]
+enum Comparison {
+    /// Every pixel matches.
+    Same,
+    /// The images differ; the string names the first difference.
+    Different(String),
+}
+
 /// A parsed `P6` PPM: dimensions plus row-major RGB bytes.
+#[derive(Debug)]
 struct Ppm {
     /// Width in pixels.
     width: u32,
@@ -75,36 +91,47 @@ struct Ppm {
 }
 
 /// Parse a binary PPM, tolerating `#` comments in the header.
-fn parse_ppm(bytes: &[u8]) -> Ppm {
+///
+/// Returns a reason rather than panicking: a comparer that panics on a malformed golden is a
+/// comparer whose failure mode depends on where the panic happens to be caught. The caller has to
+/// handle the error, which is the point — a silent success here would certify a wrong render.
+fn parse_ppm(bytes: &[u8]) -> Result<Ppm, String> {
     let mut at = 0;
-    let magic = ppm_token(bytes, &mut at).expect("PPM magic");
-    assert_eq!(magic, b"P6", "goldens are binary PPM");
-    let width: u32 = number(ppm_token(bytes, &mut at).expect("PPM width"));
-    let height: u32 = number(ppm_token(bytes, &mut at).expect("PPM height"));
-    let maxval: u32 = number(ppm_token(bytes, &mut at).expect("PPM maxval"));
-    assert_eq!(maxval, 255, "8-bit PPM");
+    let magic = ppm_token(bytes, &mut at).ok_or("missing PPM magic")?;
+    if magic != b"P6" {
+        return Err(format!(
+            "magic is {:?}, expected P6 (binary PPM)",
+            String::from_utf8_lossy(magic)
+        ));
+    }
+    let width = number(ppm_token(bytes, &mut at).ok_or("missing width")?)?;
+    let height = number(ppm_token(bytes, &mut at).ok_or("missing height")?)?;
+    let maxval = number(ppm_token(bytes, &mut at).ok_or("missing maxval")?)?;
+    if maxval != 255 {
+        return Err(format!("maxval is {maxval}, expected 255"));
+    }
+    if width == 0 || height == 0 {
+        return Err(format!(
+            "canvas is {width}x{height}, which cannot hold pixels"
+        ));
+    }
     // Exactly one whitespace byte separates the header from the raster.
     at += 1;
     let pixels = bytes
         .get(at..)
-        .unwrap_or_else(|| {
-            panic!(
-                "PPM is truncated: header ends at {at}, file is {}",
-                bytes.len()
-            )
-        })
-        .to_vec();
-    assert_eq!(
-        pixels.len(),
-        (width * height * 3) as usize,
-        "{width}x{height} PPM must hold {} bytes of raster",
-        width * height * 3
-    );
-    Ppm {
+        .ok_or_else(|| format!("header ends at {at}, past the end of {}", bytes.len()))?;
+    let expected_len = (width * height * 3) as usize;
+    if pixels.len() != expected_len {
+        return Err(format!(
+            "{width}x{height} PPM holds {} raster bytes, expected {expected_len}",
+            pixels.len()
+        ));
+    }
+    Ok(Ppm {
         width,
         height,
-        pixels,
-    }
+        pixels: pixels.to_vec(),
+    })
 }
 
 /// The next header token, skipping whitespace and `#` comments.
@@ -129,23 +156,36 @@ fn ppm_token<'a>(bytes: &'a [u8], at: &mut usize) -> Option<&'a [u8]> {
 }
 
 /// Parse an ASCII header number.
-fn number(token: &[u8]) -> u32 {
+fn number(token: &[u8]) -> Result<u32, String> {
     std::str::from_utf8(token)
-        .expect("PPM header is ASCII")
+        .map_err(|_| format!("header token {token:?} is not ASCII"))?
         .parse()
-        .expect("PPM header number")
+        .map_err(|_| {
+            format!(
+                "header token {:?} is not a number",
+                String::from_utf8_lossy(token)
+            )
+        })
 }
 
-/// Describe the first difference between two PPM images, or `None` when they match.
+/// Compare two images pixel by pixel.
 ///
-/// The message names pixels, not byte offsets: "pixel (12, 40) is #ffffff, expected #dddddd" is
-/// something a human can act on, and the count says whether the problem is one pixel or the whole
-/// page.
-fn diff_pixels(expected: &[u8], actual: &[u8]) -> Option<String> {
-    let expected = parse_ppm(expected);
-    let actual = parse_ppm(actual);
+/// `Err` means the inputs could not be compared at all — unparsable bytes or a different canvas —
+/// and is deliberately *not* folded into [`Comparison::Different`]: a caller that only looks for
+/// "same" cannot miss it, because there is no `Ok` to match on. A canvas mismatch in particular
+/// must never read as a pass, and must never read as a pixel diff either: the coordinates in a
+/// size-changed image are meaningless.
+///
+/// The `Different` message names pixels, not byte offsets: "1 of 30,000 pixels differ; first at
+/// (12, 40): golden #ffffff, actual #dddddd" is something a human can act on, and the count says
+/// whether the problem is one pixel or the whole page.
+fn compare_ppm(expected: &[u8], actual: &[u8]) -> Result<Comparison, String> {
+    let expected =
+        parse_ppm(expected).map_err(|reason| format!("golden is not a valid PPM: {reason}"))?;
+    let actual =
+        parse_ppm(actual).map_err(|reason| format!("render is not a valid PPM: {reason}"))?;
     if (expected.width, expected.height) != (actual.width, actual.height) {
-        return Some(format!(
+        return Err(format!(
             "canvas is {}x{}, golden is {}x{}",
             actual.width, actual.height, expected.width, expected.height
         ));
@@ -165,10 +205,12 @@ fn diff_pixels(expected: &[u8], actual: &[u8]) -> Option<String> {
         }
     }
 
-    let (index, want, got) = first?;
+    let Some((index, want, got)) = first else {
+        return Ok(Comparison::Same);
+    };
     let x = index as u32 % expected.width;
     let y = index as u32 / expected.width;
-    Some(format!(
+    Ok(Comparison::Different(format!(
         "{differing} of {} pixels differ; first at ({x}, {y}): golden #{:02x}{:02x}{:02x}, actual #{:02x}{:02x}{:02x} (canvas {}x{})",
         expected.width * expected.height,
         want[0],
@@ -179,7 +221,7 @@ fn diff_pixels(expected: &[u8], actual: &[u8]) -> Option<String> {
         got[2],
         expected.width,
         expected.height
-    ))
+    )))
 }
 
 /// Encode a P6 PPM from RGB triples, for testing the comparer without a renderer.
@@ -196,18 +238,25 @@ fn encode_ppm(width: u32, height: u32, pixels: &[(u8, u8, u8)]) -> Vec<u8> {
 /// always answered "equal" would make every golden test pass on a wrong render. So it is tested
 /// against synthetic images now, rather than first being exercised by the goldens it judges.
 #[test]
-fn diff_reports_the_first_differing_pixel() {
+fn compare_matches_identical_images() {
+    let image = encode_ppm(2, 1, &[(255, 255, 255), (0, 0, 0)]);
+    assert!(
+        matches!(compare_ppm(&image, &image), Ok(Comparison::Same)),
+        "identical images must match"
+    );
+}
+
+/// A changed pixel must be reported, with the coordinate and both colours.
+#[test]
+fn compare_reports_the_first_differing_pixel() {
     let white = (255, 255, 255);
     let golden = encode_ppm(2, 1, &[white, (0, 0, 0)]);
     let rendered = encode_ppm(2, 1, &[white, (1, 2, 3)]);
 
-    assert_eq!(
-        diff_pixels(&golden, &golden),
-        None,
-        "identical images match"
-    );
-
-    let message = diff_pixels(&golden, &rendered).expect("a changed pixel must be reported");
+    let message = match compare_ppm(&golden, &rendered) {
+        Ok(Comparison::Different(message)) => message,
+        other => panic!("a changed pixel must be reported, got {other:?}"),
+    };
     assert!(message.contains("1 of 2 pixels differ"), "{message}");
     assert!(
         message.contains("(1, 0)"),
@@ -219,16 +268,33 @@ fn diff_reports_the_first_differing_pixel() {
     );
 }
 
-/// A different canvas is a different image, and must not be reported as "equal but shorter".
+/// A canvas mismatch is rejected outright, not zipped to the shorter image and reported as a
+/// difference — that silently passes when the render is too tall and the extra rows are blank.
 #[test]
-fn diff_reports_a_canvas_mismatch() {
-    let small = encode_ppm(1, 1, &[(0, 0, 0)]);
-    let large = encode_ppm(2, 1, &[(0, 0, 0), (0, 0, 0)]);
-    let message = diff_pixels(&small, &large).expect("a canvas change must be reported");
+fn compare_rejects_a_canvas_mismatch() {
+    let golden = encode_ppm(200, 150, &[(255, 255, 255); 200 * 150]);
+    let shorter = encode_ppm(200, 149, &[(255, 255, 255); 200 * 149]);
+    let error = compare_ppm(&golden, &shorter).expect_err("a canvas change must be rejected");
     assert!(
-        message.contains("2x1") && message.contains("1x1"),
-        "{message}"
+        error.contains("200x149") && error.contains("200x150"),
+        "the message must name both canvases: {error}"
     );
+}
+
+/// A golden with the wrong magic is not a golden; the parser must say so rather than read the
+/// bytes as a raster and report a pixel diff against nonsense.
+#[test]
+fn ppm_parser_rejects_bad_magic() {
+    let error = parse_ppm(b"P5\n1 1\n255\n\0\0\0").expect_err("P5 is not a binary PPM");
+    assert!(error.contains("P5"), "{error}");
+    assert!(parse_ppm(b"not a ppm at all").is_err());
+}
+
+/// A truncated raster must be rejected, not compared up to the point where it runs out.
+#[test]
+fn ppm_parser_rejects_a_truncated_raster() {
+    let error = parse_ppm(b"P6\n2 2\n255\n\0\0\0").expect_err("3 of 12 raster bytes is truncated");
+    assert!(error.contains("expected 12"), "{error}");
 }
 
 /// T61 · golden — hello.html. In: the full-feature fixture at 200×150 — Out: pixels identical to
