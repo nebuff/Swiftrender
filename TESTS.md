@@ -288,7 +288,33 @@ producing byte-identical PNGs twice. Why: deterministic layout does not imply de
 (iteration order, uninitialised buffers), so the original T58 assertion is repeated at the layer
 it actually describes rather than inherited. Ignores: needs paint.
 
+### I. Golden regression (T61–T63)
+
+These three compare a render against an approved PPM at 200×150. They differ from every other entry
+in what makes them pass: not new code, but a **human signing an image** (`ROADMAP.md`, "Golden
+files: who signs them"). They are `#[ignore]`d until then, and the ignore reason names the missing
+file so an early un-ignore fails with an explanation instead of a file-not-found.
+
+**T61 · golden hello** — In: `fixtures/hello.html` — Out: pixels identical to
+`fixtures/hello.expected.ppm`. Why: the most-used fixture is the one whose regressions hurt most.
+
+**T62 · golden list** — In: `fixtures/list.html` (nested `ul`/`li`, one classed item) — Out: pixels
+identical to `fixtures/list.expected.ppm`. Why: list indentation plus per-item text placement spans
+two layers, and no single-value assertion pins the combination.
+
+**T63 · golden boxes** — In: `fixtures/boxes.html` (padding, border, explicit width, centred text)
+— Out: pixels identical to `fixtures/boxes.expected.ppm`. Why: the box model is where "it lays out"
+and "it looks right" can disagree, and only an image comparison sees the difference.
+
+*Why they are numbered rather than meta-tests:* they are spec-level assertions about §7 output, and
+numbering puts them inside the ignore budget `tests/meta.rs` polices — a golden that quietly
+stopped running would show up as a count change.
+
+*Why the goldens are PPM:* byte-comparable without a decoder dependency, which keeps the
+zero-runtime-dependency premise intact. PNG goldens would be smaller but would need a decoder in
+dev-dependencies, reopening a question the artifact rests on.
+
 **Coverage check:** parsing 8, cascade 9, box model 7, block layout 6, inline 10, paint 8,
-output/CLI 7, robustness 5 = **60 tests**, above the 40 minimum, with every SPEC clause §1–§10
-cited at least once. (T59 was added at the Phase 1 gate, T60 at the Phase 2 gate when T58 split;
-see their entries for why.)
+output/CLI 7, robustness 5, golden 3 = **63 tests**, above the 40 minimum, with every SPEC clause
+§1–§10 cited at least once. (T59 was added at the Phase 1 gate, T60 at the Phase 2 gate when T58
+split, T61–T63 at the Phase 2.75 gate; see their entries for why.)

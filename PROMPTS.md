@@ -230,6 +230,11 @@ are local; the failure mode is general, which is why they are written down.
 3. **A test that asserts half a clause and defers the rest to a comment** — reads as fully green
    (T6, Phase 1; the same pattern was then found twice more in T5 and T57). Fix: if a clause has N
    assertions, the test has N assertions, and deferrals become tracked tests (the T59 pattern).
+4. **`write_file` reporting "Created file successfully" for a path that already existed.** It
+   replaced a tracked `ROADMAP.md` and destroyed 44 lines of approved content — the permanent
+   refusals, the frozen M1 scope, the candidate milestones — and the success message hid the
+   overwrite. Fix: check `git ls-files <path>` before creating a file, and read the diff after
+   writing. Repair recorded in §10.
 
 ## 8. Count rule
 

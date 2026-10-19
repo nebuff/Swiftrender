@@ -14,15 +14,17 @@ use std::path::{Path, PathBuf};
 
 use common::run_cli;
 
-/// Number of numbered tests defined by `TESTS.md` (T59 was added at the Phase 1 gate, T60 at the
-/// Phase 2 gate when T58 was split).
-const EXPECTED_SPEC_TESTS: usize = 60;
+/// Number of numbered tests defined by `TESTS.md` (T59 at the Phase 1 gate, T60 at the Phase 2 gate
+/// when T58 split, T61–T63 at the Phase 2.75 gate for the golden harness).
+const EXPECTED_SPEC_TESTS: usize = 63;
 
 /// How many numbered tests are `#[ignore]`d at this phase.
 ///
 /// * Phase 1: **49**.
 /// * Phase 2: **26** — the 23 tests that assert only box geometry stop being ignored; see the
 ///   budget note below for why the number is 26 and not the 19 that was guessed at the gate.
+/// * Phase 2.75: **29** — 26 pixel-gated plus T61–T63, the golden regression tests, which are
+///   ignored because no golden has been *approved* yet, not because paint is missing.
 /// * Phase 3: **0**.
 ///
 /// Bumping this constant is a deliberate, reviewable act: it can only go down as work lands, and
@@ -37,6 +39,7 @@ const EXPECTED_SPEC_TESTS: usize = 60;
 /// T3  T9  T16 T21 T23 T28 T32 T33 T34 T35 T36 T37 T38 T59     (layout+paint cases)
 /// T41 T42 T43 T44 T45 T46 T47                                 (paint-only)
 /// T48 T49 T50 T51 T60                                         (artifact and perf cases)
+/// T61 T62 T63                                                 (golden harness)
 /// ```
 ///
 /// That leaves **23** tests that Phase 2 can flip: T1, T2, T4, T10–T15, T17–T20, T22, T24–T27,
@@ -53,11 +56,17 @@ const EXPECTED_SPEC_TESTS: usize = 60;
 /// as the `40 / 19` estimate, one level down. Phase 2's exit is therefore `34 / 26 / 0`, and the
 /// constants here say so.
 ///
+/// **Phase 2.75** added T61–T63, the golden harness. They are a *different kind* of ignore: the
+/// code exists, but the expected image is a contract a human has not signed yet (`ROADMAP.md`),
+/// so nothing about them waits on an implementation. They are counted separately from the block
+/// above — `passed == 34, ignored == 29, failed == 0` — and they are the only entries in the list
+/// that will be un-ignored by *approving an artifact* rather than by writing code.
+///
 /// Splitting a mixed test to move the number was considered and rejected: T6 was split because its
 /// clause §2.3 is fully satisfiable at the DOM layer, but for T3, T9, T32, T33 and friends the
 /// painted line *is* the clause ("a forced break paints two lines", "class beats tag"), and a
 /// half-test asserting only `p.height == 40` would assert less than the spec promises.
-const EXPECTED_IGNORED: usize = 26;
+const EXPECTED_IGNORED: usize = 29;
 
 /// One numbered test found in the `spec_*.rs` files.
 struct SpecTest {
@@ -125,7 +134,7 @@ fn file_stem(path: &Path) -> String {
         .to_string()
 }
 
-/// T·meta1 — the numbered list is exactly `T1..=T60`, with no gaps and no duplicates.
+/// T·meta1 — the numbered list is exactly `T1..=T63`, with no gaps and no duplicates.
 ///
 /// Why: a gap means a clause lost its test; a duplicate means two tests claim one number and
 /// the coverage check in `TESTS.md` is lying.
