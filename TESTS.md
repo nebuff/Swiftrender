@@ -27,8 +27,13 @@ height, and auto-height chain in one case.
 **T3 · void br starts a new line** — In: `<p>a<br>b</p>` — Out: `p h=40`; ink present in both
 the y≈26 and y≈46 bands. Why: §5.5 forced break without a closing tag.
 
-**T4 · unknown element is inline** — In: `<foo>x</foo>` — Out: `body > #anon > foo(inline)`,
-`body h=20`, no panic, no warning. Why: §2.11 forward compatibility for HTML we don't model.
+**T4 · unknown element is inline** — In: `<foo>x</foo>` — Out: `body > foo(inline)` at
+`(8,8,8,20)`, `body h=20`, no panic, no warning. Why: §2.11 forward compatibility for HTML we do
+not model.
+
+*Expectation corrected at the Phase 2 gate:* the original said `body > #anon > foo`. §5.3 wraps
+inline runs only where inline and block children **mix**, so an all-inline body needs no wrapper,
+and an inline box's rectangle covers the line box it occupies (20px), not the 16px glyph cell.
 
 **T5 · entity decoding** — In: `<p>&amp;&lt;&#65;</p>` — Out: text `"&<A"`, run width 24. Why:
 §2.4 numeric and named entities change measured width.
@@ -64,13 +69,22 @@ warning under `--verbose`. Why: §2.10 recursion guard must be observable, not s
 green ink. Why: §3.3 last-wins at equal specificity.
 
 **T11 · inherited properties** — In: `div{text-align:center;color:#0000ff}` with
-`<div><p>x</p></div>` — Out: `p` glyph starts at `x=388` and is blue; `p`'s own `text-align`
+`<div><p>x</p></div>` — Out: `p` glyph starts at `x=396` and is blue; `p`'s own `text-align`
 computed value is `center`. Why: §3.7 inheritance through an element that never declares the
 property.
 
+*Expectation corrected at the Phase 2 gate:* `388` is the centring offset alone, but offsets are
+measured inside the content box, which starts at `x=8`, so the glyph lands at
+`8 + round((784 − 8)/2) = 396`. T33's `388` is a different fixture with a different offset and was
+already correct.
+
 **T12 · non-inherited margin** — In: `div{margin:10px}` with `<div><p>x</p></div>` — Out: `p`
-box top `= 8+10+16 = 34`, `p margin=0,0,0,0`. Why: §3.7 must not leak box-model properties to
+box top `= 8+10+16 = 34`, `p margin=16,0,16,0`. Why: §3.7 must not leak box-model properties to
 children.
+
+*Expectation corrected at the Phase 2 gate:* the original asserted `margin=0`, which contradicts
+the UA sheet's `p { margin: 16px 0 }`. "Not inherited" means the paragraph keeps its **own**
+margin — the one the UA sheet gives it — not that it has none.
 
 **T13 · selector list** — In: `h1, p { margin: 0 }` — Out: both boxes report
 `margin=0,0,0,0`. Why: §3.2 comma lists expand to independent rules.
@@ -141,8 +155,15 @@ through padding.
 
 ### E. Inline formatting (T31–T40)
 
-**T31 · greedy wrapping** — In: `<p>` + `a`×100 — Out: 98 glyphs on line 1 (width 784), 2 on
-line 2, `p h=40`. Why: §6.5 breaking exactly when the next item would exceed W.
+**T31 · greedy wrapping** — In: `<p>` + `"ab "`×60 — Out: two line fragments, widths 784 and
+640, `p h=40`. Why: §6.5 breaks exactly when the next item would exceed W.
+
+*Fixture corrected at the Phase 2 gate:* as originally written (100 consecutive `a` glyphs) this
+test contradicted **T32**, which requires an unbreakable run to overflow on a single line. A run of
+100 `a`s contains no break opportunity at all, so no engine satisfying §6.5 ("a word is never
+split") can produce two lines from it. The fixture now uses whitespace-separated words, and is
+stronger than the original: 33 words measure `33 × 16 + 32 × 8 = 784`, exactly the content width,
+so it pins the exactly-full boundary as well as the ordinary break.
 
 **T32 · unbreakable word overflows** — In: `<p>` + `a`×200 — Out: one line, `p h=20`, ink
 extends past x=792, no error. Why: §6.5 no mid-word breaks, no crash.

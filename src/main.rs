@@ -7,7 +7,9 @@
 use std::process::ExitCode;
 
 use swiftrender::cli::{self, CliError, Emit, Options};
+use swiftrender::css::Css;
 use swiftrender::html;
+use swiftrender::layout;
 
 /// Exit code for a usage error (`SPEC.md` §9.2).
 const EXIT_USAGE: u8 = 2;
@@ -48,15 +50,19 @@ fn run(args: &[String]) -> ExitCode {
     }
 
     let document = html::parse(&source);
+    let mut warnings = document.warnings.clone();
+    let (width, height) = options.size;
+    let css = Css::from_document(&document, &mut warnings);
+    let tree = layout::layout_document(&document, &css, width, height, &mut warnings);
+
     if options.verbose {
-        for warning in &document.warnings {
+        for warning in &warnings {
             eprintln!("swiftrender: warning: {warning}");
         }
     }
 
-    let (width, height) = options.size;
     let text = match options.emit {
-        Emit::Tree => html::dump::dump(&document, width, height),
+        Emit::Tree => layout::dump_tree(&tree),
         other => {
             eprintln!(
                 "swiftrender: --emit {} is not implemented yet; run with --emit tree",

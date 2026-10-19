@@ -13,7 +13,6 @@ use common::*;
 ///
 /// Why: §2.7 wrapper synthesis and §6.4 auto height including the body's bottom margin.
 #[test]
-#[ignore = "phase 2: needs block layout"]
 fn t01_implicit_html_and_body_wrappers() {
     let lines = boxes("<div></div>");
     let div = find(&lines, "div");
@@ -30,7 +29,6 @@ fn t01_implicit_html_and_body_wrappers() {
 ///
 /// Why: pins UA margins, line box height, and the auto-height chain in one case.
 #[test]
-#[ignore = "phase 2: needs block layout"]
 fn t02_single_paragraph_geometry() {
     let lines = boxes("<p>hi</p>");
     let root = find(&lines, "html");
@@ -57,26 +55,28 @@ fn t03_void_br_starts_a_new_line() {
     assert!(image.has_ink(8, 26, 8, 16), "first line has ink");
     assert!(image.has_ink(8, 46, 8, 16), "second line has ink");
 }
-
-/// T4 · unknown element is inline — In: `<foo>x</foo>` — Out: `body > #anon > foo(inline)`,
-/// `body h=20`, no panic, no warning.
+/// T4 · unknown element is inline — In: `<foo>x</foo>` — Out: `body > foo(inline)` at
+/// `(8,8,8,20)`, `body h=20`, no panic, no warning.
 ///
 /// Why: §2.11 forward compatibility for HTML we do not model.
+///
+/// *Expectation corrected at the Phase 2 gate:* the original said `body > #anon > foo`. §5.3 only
+/// requires a wrapper where inline and block children *mix*, so an all-inline body needs none — and
+/// an inline box's rectangle covers the line box it occupies (20px), not just the 16px glyph cell.
 #[test]
-#[ignore = "phase 2: needs computed display"]
 fn t04_unknown_element_is_inline() {
     let doc = parse("<foo>x</foo>");
     assert_eq!(element_names(&doc), vec!["head", "body", "foo"]);
     assert!(doc.warnings.is_empty(), "unknown elements are not an error");
 
     let lines = boxes("<foo>x</foo>");
-    assert_eq!(
-        find(&lines, "#anon").height,
-        20,
-        "text sits in one anonymous block"
+    assert!(
+        filter(&lines, "#anon").is_empty(),
+        "all-inline content needs no anonymous block: {lines:#?}"
     );
     let foo = find(&lines, "foo");
-    assert_eq!((foo.x, foo.y, foo.height), (8, 8, 16));
+    assert_eq!((foo.x, foo.y, foo.width, foo.height), (8, 8, 8, 20));
+    assert_eq!(find(&lines, "body").height, 20);
 }
 
 /// T5 · entity decoding — In: `<p>&amp;&lt;&#65;</p>` — Out: text `"&<A"`, run width 24.

@@ -8,20 +8,26 @@ mod common;
 
 use common::*;
 
-/// T31 · greedy wrapping — In: `<p>` followed by 100 `a` glyphs — Out: 98 glyphs on line 1
-/// (784px), 2 on line 2, `p h=40`.
+/// T31 · greedy wrapping — In: `<p>` followed by `"ab "`×60 — Out: two line fragments, widths
+/// 784 and 640, `p h=40`.
 ///
 /// Why: §6.5 breaks exactly when the next item would exceed the content width.
+///
+/// *Fixture corrected at the Phase 2 gate:* the original fixture was 100 consecutive `a` glyphs,
+/// which contains no break opportunity and therefore contradicts T32 (an unbreakable run must
+/// overflow on one line). See the note on T31 in `TESTS.md`.
 #[test]
-#[ignore = "phase 2: needs inline layout"]
 fn t31_lines_break_greedily() {
-    let fixture = format!("<p>{}</p>", "a".repeat(100));
+    let fixture = format!("<p>{}</p>", "ab ".repeat(60));
     let lines = boxes(&fixture);
     assert_eq!(find(&lines, "p").height, 40, "{lines:#?}");
     let runs = filter(&lines, "#text");
     assert_eq!(runs.len(), 2, "two line fragments: {lines:#?}");
-    assert_eq!(runs[0].text_width, 784);
-    assert_eq!(runs[1].text_width, 16);
+    assert_eq!(
+        runs[0].text_width, 784,
+        "33 words at 16px plus 32 spaces at 8px"
+    );
+    assert_eq!(runs[1].text_width, 640, "27 words plus 26 spaces");
 }
 
 /// T32 · unbreakable word overflows — In: `<p>` followed by 200 `a` glyphs — Out: one line,
@@ -148,7 +154,6 @@ fn t38_image_css_size_overrides_intrinsic() {
 /// Why: §5.3 the hardest structural rule in M1: every block container's children are either
 /// all block or all inline.
 #[test]
-#[ignore = "phase 2: needs box generation"]
 fn t39_mixed_content_creates_anonymous_blocks() {
     let lines = boxes("<div>text<p>para</p>tail</div>");
     let div = find(&lines, "div");
@@ -176,7 +181,6 @@ fn t39_mixed_content_creates_anonymous_blocks() {
 ///
 /// Why: §6.5 leading and trailing spaces must not shift alignment.
 #[test]
-#[ignore = "phase 2: needs inline layout"]
 fn t40_whitespace_collapses_and_trims() {
     let lines = boxes("<p>  a   b  </p>");
     let text = find(&lines, "#text");

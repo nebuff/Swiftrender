@@ -12,6 +12,13 @@
 
 #![allow(dead_code)]
 
+mod boxdump;
+
+// Re-exported as a facade: each `spec_*.rs` binary glob-imports `common::*`, so any single
+// binary legitimately leaves part of this unused.
+#[allow(unused_imports)]
+pub use boxdump::*;
+
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -26,11 +33,6 @@ use swiftrender::html::{self, Child, Document, Node};
 /// Parse `html` into a [`Document`].
 pub fn parse(html: &str) -> Document {
     html::parse(html)
-}
-
-/// The `--emit tree` dump of `html` at the default 800×600 canvas.
-pub fn tree(html: &str) -> String {
-    html::dump::dump(&parse(html), 800, 600)
 }
 
 /// Every descendant element named `name`, in document order.
@@ -124,71 +126,6 @@ pub fn relative(path: &Path) -> String {
 
 // ---------------------------------------------------------------------------
 // Layout tier (Phase 2)
-// ---------------------------------------------------------------------------
-
-/// One laid-out box, as the Phase 2 box tree will report it (`SPEC.md` §6.7: integers only).
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct BoxInfo {
-    /// Tag name, `#anon` for an anonymous block (`SPEC.md` §5.3), or `#text` for a text run.
-    pub tag: String,
-    /// Left edge of the box in pixels.
-    pub x: i32,
-    /// Top edge of the box in pixels.
-    pub y: i32,
-    /// Box width in pixels.
-    pub width: i32,
-    /// Box height in pixels.
-    pub height: i32,
-    /// Margin edges as `[top, right, bottom, left]`.
-    pub margin: [i32; 4],
-    /// Text content of the box, if any.
-    pub text: Option<String>,
-    /// Measured width of [`BoxInfo::text`] in pixels (`SPEC.md` §6.6).
-    pub text_width: i32,
-    /// Computed font size in pixels.
-    pub font_size: i32,
-    /// Computed text colour.
-    pub color: (u8, u8, u8),
-}
-
-/// Lay `html` out and return every box in pre-order.
-///
-/// **Contract (Phase 2):** this must run the real binary with `--emit tree` and parse the
-/// `SPEC.md` §8.1 lines, rather than reaching into the library. Layout is the layer where an
-/// in-process assertion is easiest and least meaningful: if `--emit tree` prints a box at
-/// `(8,24,784,20)` while some internal struct agrees, the artifact a human would read is still
-/// the one that has to be right. Tests that go through the binary already do this for PNG, SVG
-/// and PPM (`png_bytes`, `svg_text`, `ppm_bytes`), and layout should behave the same way.
-///
-/// `BoxInfo` fields are exact `i32` values because §6.7 snaps geometry once, before the tree is
-/// printed: there is no tolerance to apply and no float to compare.
-///
-/// **Do not "optimize" this into a library call.** The point is that a human reading
-/// `--emit tree` and a test asserting on the same bytes cannot disagree; routing the assertion
-/// through an internal struct would recreate exactly the gap this helper exists to close. This
-/// decision was reviewed and confirmed at the Phase 1 gate, so changing it needs a reason that
-/// beats that one in a commit message.
-///
-/// Panics until Phase 2 implements layout; every caller is `#[ignore]`d until then.
-pub fn boxes(_html: &str) -> Vec<BoxInfo> {
-    unimplemented!("layout arrives in phase 2 (SPEC.md §5-§6)")
-}
-
-/// Find the first box whose tag equals `tag`.
-pub fn find<'a>(boxes: &'a [BoxInfo], tag: &str) -> &'a BoxInfo {
-    boxes
-        .iter()
-        .find(|item| item.tag == tag)
-        .unwrap_or_else(|| panic!("no box with tag {tag:?} in {boxes:#?}"))
-}
-
-/// All boxes whose tag equals `tag`.
-pub fn filter<'a>(boxes: &'a [BoxInfo], tag: &str) -> Vec<&'a BoxInfo> {
-    boxes.iter().filter(|item| item.tag == tag).collect()
-}
-
-// ---------------------------------------------------------------------------
-// Paint tier (Phase 3)
 // ---------------------------------------------------------------------------
 
 /// An RGB raster produced by the renderer (`SPEC.md` §7).

@@ -121,6 +121,13 @@ a      { color: #0000ee }
   writing modes.
 - **§6.2** Block content width: `auto` → `max(0, cb_content_w − ml − mr − bl − br − pl − pr)`;
   `Npx` → `N`; `auto` margins → `0` (no centering).
+- **§6.2a** *(added at the Phase 2 gate)* An explicit `width`/`height` is a **border-box**
+  dimension, not a content-box one: padding and border eat into it rather than growing the box.
+  This deviates from CSS's default `content-box`, and it is forced by the numbered tests as
+  approved — T21 expects `border: 2px solid` plus `height: 20px` to produce a 20px-tall box,
+  while T20 expects `padding: 10px` with `width: auto` to keep the border box at 784px and narrow
+  only the content box. Under content-box semantics those two expectations contradict each other.
+  The deviation is visible in the dump, where `w`/`h` are always border-box dimensions.
 - **§6.3** Block position: content top = parent content top + accumulated flow offset +
   `margin-top`. **Vertical margins MUST NOT collapse.** Horizontal offset = parent content
   left + `margin-left` + `border-left` + `padding-left`.
@@ -166,10 +173,16 @@ a      { color: #0000ee }
 ## 8. Output formats
 
 - **§8.1** `tree`: deterministic text. Header
-  `swiftrender <title or (untitled)> <W>x<H>`; then one line per box, indented 2 spaces per
-  depth:
-  `tag.cls   x=<i> y=<i> w=<i> h=<i>  margin=<t,r,b,l> padding=<t,r,b,l> border=<t,r,b,l>`.
-  Anonymous blocks print as `#anon`, text runs as `"text"`.
+  `swiftrender <title or (untitled)> <W>x<H>`, then the literal line `box tree`, then one line per
+  box, indented 2 spaces per depth:
+  `tag.cls   x=<i> y=<i> w=<i> h=<i>  margin=<t,r,b,l> padding=<t,r,b,l> border=<t,r,b,l>  font=<i> color=#rrggbb`.
+  Anonymous blocks print as `#anon`, text runs as their quoted, escaped text.
+- **§8.1a** *(added at the Phase 2 gate)* Two extensions the numbered tests require, both
+  machine-read by `tests/common/boxdump.rs` and therefore part of the format contract:
+  every line also carries the computed `font` size and `color` (T9, T15, T27, T59), and a text run
+  prints its content as the quoted label so `text` and its measured width (the line's `w`) are
+  both recoverable (T31, T40). A quoted label can contain spaces, so the label is everything
+  before the `x=` marker.
 - **§8.2** `ppm`: exactly `P6\n<W> <H>\n255\n` followed by RGB triples, no comments.
 - **§8.3** `png`: PNG 1.2, bit depth 8, colour type 2 (truecolour), no interlace, filter type
   0 on every row, a single `IDAT` built from **stored** deflate blocks, correct per-chunk

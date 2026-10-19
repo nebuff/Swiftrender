@@ -12,7 +12,6 @@ use common::*;
 ///
 /// Why: §6.3 plain sequential flow with zero margins.
 #[test]
-#[ignore = "phase 2: needs block layout"]
 fn t25_siblings_stack_in_flow_order() {
     const FIXTURE: &str = "<style>div{height:20px}</style><div></div><div></div>";
     let lines = boxes(FIXTURE);
@@ -26,7 +25,6 @@ fn t25_siblings_stack_in_flow_order() {
 ///
 /// Why: §6.3 the explicit anti-CSS simplification that is easiest to regress by accident.
 #[test]
-#[ignore = "phase 2: needs block layout"]
 fn t26_vertical_margins_do_not_collapse() {
     let lines = boxes("<p>a</p><p>b</p>");
     let ps = filter(&lines, "p");
@@ -45,7 +43,6 @@ fn t26_vertical_margins_do_not_collapse() {
 ///
 /// Why: §4 UA font size plus the §6.6 advance formula at a non-default size.
 #[test]
-#[ignore = "phase 2: needs block layout"]
 fn t27_h1_uses_the_u32_metrics() {
     let lines = boxes("<h1>x</h1>");
     let h1 = find(&lines, "h1");
@@ -81,7 +78,6 @@ fn t28_list_indentation_and_markers() {
 ///
 /// Why: §6.4 explicit height wins; auto height would have been 52.
 #[test]
-#[ignore = "phase 2: needs block layout"]
 fn t29_explicit_height_is_not_shrunk_by_content() {
     const FIXTURE: &str = "<style>div{height:100px}</style><div><p>a</p></div>";
     let lines = boxes(FIXTURE);
@@ -94,7 +90,6 @@ fn t29_explicit_height_is_not_shrunk_by_content() {
 ///
 /// Why: §6.2 the containing block for the inner div is the outer div's content box.
 #[test]
-#[ignore = "phase 2: needs block layout"]
 fn t30_auto_width_recurses_through_padding() {
     const FIXTURE: &str = "<style>div{padding:5px}</style><div><div></div></div>";
     let lines = boxes(FIXTURE);

@@ -44,7 +44,7 @@ const EXPECTED_SPEC_TESTS: usize = 59;
 /// clause §2.3 is fully satisfiable at the DOM layer, but for T3, T9, T32, T33 and friends the
 /// painted line *is* the clause ("a forced break paints two lines", "class beats tag"), and a
 /// half-test asserting only `p.height == 40` would assert less than the spec promises.
-const EXPECTED_IGNORED: usize = 49;
+const EXPECTED_IGNORED: usize = 26;
 
 /// One numbered test found in the `spec_*.rs` files.
 struct SpecTest {

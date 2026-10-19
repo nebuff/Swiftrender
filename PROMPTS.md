@@ -128,3 +128,50 @@ painted line *is* the clause.
 **Process note worth keeping:** the agent's own arithmetic was wrong (it said 24 paint-gated tests;
 the awk scan said 26, because T9 and T16 carry raster assertions it had forgotten). The lesson is
 the same one as T6, one level down: derive counts from artifacts, never from memory.
+
+## 5. Phase 2 — cascade and layout
+
+**Target, agreed before starting:** `passed == 33, ignored == 26, failed == 0` on the numbered list,
+with the 26 being exactly the tests that assert pixels. Delivered as agreed.
+
+**What was built:** `css/` (value types, computed style, stylesheet scanner, cascade, UA sheet) and
+`layout/` (box generation with anonymous-block wrapping and `display: none` suppression, font
+metrics, block flow, inline line breaking with whitespace collapsing and `text-align`, and the
+§8.1 box dump). `--emit tree` now prints the box tree, and `boxes()` in the test harness reads the
+real binary's output, as the Phase 1 gate required.
+
+**Four expectations in the approved test list were wrong, and the engine was right in every case.**
+Each was corrected in the test *and* in `TESTS.md`, with the reason recorded inline:
+
+* **T31 vs T32 were mutually contradictory.** T31 asked 100 consecutive `a` glyphs to wrap into 98 +
+  2, while T32 asks an unbreakable run to overflow on one line. A run of `a`s has no break
+  opportunity, so no engine obeying §6.5 ("a word is never split") can satisfy both. T31 now uses
+  `"ab "`×60 — 33 words measure exactly 784px, so the corrected fixture is stronger than the original:
+  it pins the exactly-full boundary.
+* **T4** expected `body > #anon > foo`. §5.3 only wraps where inline and block children mix, and an
+  inline box covers its line box (20px), not its glyph cell (16px).
+* **T11** expected `x=388`, the centring offset alone, ignoring that offsets are measured from the
+  content-box origin at `x=8` — the glyph is at 396.
+* **T12** expected the paragraph's margin to be zero, contradicting the UA sheet's `p { margin: 16px
+  0 }`. "Not inherited" means it keeps its own margin, not that it has none.
+
+**One deviation had to be written into the spec.** T20 and T21, as approved in Phase 0, contradict
+each other under CSS's default content-box sizing: T21 wants `height: 20px` plus a 2px border to
+produce a 20px-tall box, while T20 wants `width: auto` plus padding to keep the border box at 784px.
+M1 therefore uses **border-box** sizing for explicit `width`/`height`, recorded as `SPEC.md` §6.2a.
+The dump's `w`/`h` are border-box dimensions, which is what every geometry test already assumed.
+
+**A tool caught what the agent's memory did not.** After the first full run, the agent reported
+"only three failing tests"; that was an artifact of `cargo` stopping at the first failing test
+binary. `--no-fail-fast` revealed 31. The same run also exposed that the agent's hand-written
+`boxes()` parser silently defaulted `x` to 0 — the line grammar puts the x *value* immediately after
+the `  x=` separator, so tokenising the remainder dropped it, and only assertions that happened to
+expect 0 could pass. Both are the same lesson as T6 and the 24-vs-26 count: **read the tool's real
+output, not the summary you remember writing.**
+
+**Process note worth keeping:** three files crossed the 400-line budget during the phase
+(`css/style.rs`, `layout/inline.rs`, `tests/common/mod.rs`). They were split *before* adding more,
+as instructed at the Phase 1 gate — and the first split attempt itself was wrong: it cut at a marker
+that appeared earlier in the file than the agent assumed, so the "split" moved half of the module
+into the wrong file. The fix was to reconstruct from the preserved parts and split by *parsed item
+boundaries* rather than by line numbers remembered from an earlier `grep`.

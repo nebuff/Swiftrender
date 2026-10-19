@@ -11,7 +11,6 @@ use common::*;
 ///
 /// Why: §6.2 baseline behaviour that every later width test is measured against.
 #[test]
-#[ignore = "phase 2: needs block layout"]
 fn t18_auto_width_fills_the_containing_block() {
     assert_eq!(find(&boxes("<div></div>"), "div").width, 784);
 }
@@ -20,7 +19,6 @@ fn t18_auto_width_fills_the_containing_block() {
 ///
 /// Why: §6.2 an explicit width must not stretch to the containing block.
 #[test]
-#[ignore = "phase 2: needs block layout"]
 fn t19_explicit_width_is_honoured() {
     let lines = boxes("<style>div{width:100px}</style><div></div>");
     let div = find(&lines, "div");
@@ -32,7 +30,6 @@ fn t19_explicit_width_is_honoured() {
 ///
 /// Why: §6.2/§6.3 padding is subtracted from the containing block, it does not grow the box.
 #[test]
-#[ignore = "phase 2: needs block layout"]
 fn t20_padding_narrows_the_content_box() {
     const FIXTURE: &str = "<style>div{padding:10px}</style><div><p>x</p></div>";
     let lines = boxes(FIXTURE);
@@ -69,7 +66,6 @@ fn t21_border_occupies_the_border_band() {
 ///
 /// Why: §6.3 vertical vs horizontal margin bookkeeping.
 #[test]
-#[ignore = "phase 2: needs block layout"]
 fn t22_asymmetric_margins_offset_both_axes() {
     let lines = boxes("<style>div{margin:5px 10px}</style><div></div>");
     let div = find(&lines, "div");
@@ -103,7 +99,6 @@ fn t23_display_none_removes_the_subtree() {
 ///
 /// Why: §6.4/§7.7 overflow is visible, never clipped.
 #[test]
-#[ignore = "phase 2: needs block layout"]
 fn t24_explicit_height_overflows_visibly() {
     const FIXTURE: &str = "<style>div{height:10px}</style><div><p>a</p></div>";
     let lines = boxes(FIXTURE);

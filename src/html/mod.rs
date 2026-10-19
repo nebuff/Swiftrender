@@ -10,9 +10,10 @@
 //! * [`entity`] — character references (`&amp;`, `&#65;`).
 //! * [`tokenizer`] — tags, attributes and text runs.
 //! * [`tree`] — tree construction, implicit `<html>`/`<body>`, recovery, depth cap.
-//! * [`dump`] — the human-readable tree used by `--emit tree`.
+//!
+//! The DOM dump that Phase 1 printed for `--emit tree` is gone: `SPEC.md` §8.1 specifies a *box*
+//! tree, and [`crate::layout::serialize`] is the one artifact renderer from Phase 2 on.
 
-pub mod dump;
 pub mod entity;
 pub mod tokenizer;
 pub mod tree;
